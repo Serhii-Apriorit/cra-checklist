@@ -126,6 +126,8 @@
     }
     document.getElementById("general-verification-panel").hidden = name !== "general";
     mountPoint.hidden = name !== "detailed";
+    const grouped = document.getElementById("grouped-verification-panel");
+    if (grouped) grouped.hidden = name !== "grouped";
   }
 
   function createTabs(general) {
@@ -133,7 +135,9 @@
     tabs.id = "cra-verification-tabs";
     tabs.setAttribute("role", "tablist");
     tabs.setAttribute("aria-label", "Verification type");
-    for (const [name, title, subtitle] of [["general", "General verification", "10 readiness requirements"], ["detailed", "Detailed verification", `${catalog.items.length} developer controls`]]) {
+    const tabDefinitions = [["general", "General verification", "10 readiness requirements"], ["detailed", "Detailed verification", `${catalog.items.length} developer controls`]];
+    if (window.CRAGroupedCatalog) tabDefinitions.push(["grouped", "Grouped verification", `${window.CRAGroupedCatalog.groups.length} questions · experiment`]);
+    for (const [name, title, subtitle] of tabDefinitions) {
       const tab = button("", "verification-tab", () => selectTab(name));
       tab.id = `${name}-verification-tab`;
       tab.dataset.tab = name;
@@ -143,7 +147,9 @@
       tab.addEventListener("keydown", event => {
         if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
         event.preventDefault();
-        selectTab(event.key === "Home" ? "general" : event.key === "End" ? "detailed" : activeTab === "general" ? "detailed" : "general", true);
+        const names = tabDefinitions.map(([name]) => name);
+        const next = (names.indexOf(activeTab) + (event.key === "ArrowLeft" ? -1 : 1) + names.length) % names.length;
+        selectTab(event.key === "Home" ? names[0] : event.key === "End" ? names[names.length - 1] : names[next], true);
       });
       tabs.append(tab);
     }

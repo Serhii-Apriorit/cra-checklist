@@ -1,0 +1,46 @@
+/* Keep experiment styling inside its panel. */
+.gv-workspace .gv-how { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; margin:20px 0; padding:18px; background:#fff6ee; border:1px solid #f1d5c2; border-radius:6px; }
+.gv-how strong { font-size:12px; color:#903b11; }
+.gv-how p { font-size:11px; margin:8px 0 0; color:#555; }
+.gv-workspace .gv-independence { font-size:11px; }
+.gv-toolbar { display:grid; grid-template-columns:2fr 1fr; gap:16px; padding:18px; background:#eee; border-radius:6px; }
+.gv-question h3 { font-size:17px; line-height:1.6; margin:0 0 12px; }
+.gv-question p { font-size:12px; color:#555; }
+.gv-evidence { padding:14px 16px; margin:16px 0 20px; background:#f5f7f8; border-left:3px solid #778d9b; border-radius:3px; }
+.gv-evidence strong { font-size:11px; color:#465c69; }
+.gv-evidence p { margin:7px 0 0; }
+.gv-legend { margin-bottom:10px; font-size:11px; font-weight:600; color:#555; }
+.gv-question .gv-decision-note { font-size:11px; margin:0 0 12px; }
+.gv-question .gv-conflict { background:#fff7e8; border-left:3px solid #ba8a27; padding:12px; font-size:11px; }
+.gv-question .gv-group-status { font-size:11px; font-weight:600; padding-bottom:14px; border-bottom:1px solid #eee; }
+.gv-question[data-answer=No] { border-left:3px solid #b63828; }
+.gv-question[data-answer="Not applicable"] { border-left:3px solid #365ba5; }
+.gv-notes, .gv-checks { margin-top:16px; }
+.gv-notes > summary, .gv-checks > summary { font-size:12px; font-weight:600; color:#a93700; cursor:pointer; line-height:1.7; }
+.gv-workspace textarea { width:100%; box-sizing:border-box; border:1px solid #ccc; border-radius:4px; padding:10px 12px; font-size:12px; line-height:1.6; font-family:inherit; resize:vertical; color:#222; background:#fff; }
+.gv-save-state { color:#53705c; font-size:10px; }
+.gv-save-state.dv-save-error { color:#b63828; }
+.gv-workspace .gv-field, .gv-notes .dv-field { margin-top:14px; }
+.gv-control { margin:12px 0; padding:14px; background:#fafafa; border:1px solid #ddd; border-radius:4px; overflow-wrap:anywhere; }
+.gv-control > summary { cursor:pointer; font-size:12px; line-height:1.7; }
+.gv-control-status { display:block; color:#596b75; margin:6px 0 0 14px; font-size:10px; }
+.gv-control .dv-field { margin:14px 0; }
+.gv-control .gv-control-meta { font-size:10px; color:#777; }
+.gv-files summary { font-size:11px; cursor:pointer; }
+.gv-files .button { font-size:11px; margin-top:10px; }
+.gv-references a { display:inline-block; margin:3px 8px 3px 0; font-size:10px; color:#a93700; }
+.gv-agent details { margin-top:16px; }
+.gv-agent summary { cursor:pointer; font-size:12px; line-height:1.7; }
+.gv-agent .dv-field { margin:12px 0; }
+.gv-import > .button { margin:12px 8px 8px 0; font-size:11px; }
+.gv-preview { padding:14px; background:#f5f7f8; overflow-wrap:anywhere; }
+.gv-preview ul { padding-left:18px; }
+.gv-preview li { margin-bottom:12px; }
+.gv-export-status { font-size:11px; overflow-wrap:anywhere; }
+.gv-export-status:empty { display:none; }
+@media (max-width:1000px) { .gv-workspace .gv-how { grid-template-columns:1fr; gap:12px; } }
+@media (max-width:480px) {
+  .gv-toolbar { grid-template-columns:1fr; padding:14px; }
+  .gv-workspace textarea, .gv-workspace select, .gv-workspace input[type=text], .gv-workspace input[type=search] { font-size:16px; }
+  .gv-question h3 { font-size:16px; }
+}

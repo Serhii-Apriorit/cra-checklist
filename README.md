@@ -115,6 +115,36 @@ reports always contain every control. Progress is the number reviewed, including
 N/A, and is not a compliance score. Unresolved priority counts include No and
 unanswered items, excluding N/A.
 
+**Grouped verification**, the third tab, is an independent experiment with 18
+broader, evidence-led questions. It maps each of the 96 detailed controls to
+exactly one evidence bundle without changing the first two assessments. Each
+question suggests evidence to review once; expand **Coverage and individual
+exceptions** for the full original wording, priority, applicability and sources.
+
+Choose Yes only after verifying every applicable check, No for a confirmed gap,
+and N/A only when the entire group is outside scope. Yes and N/A supply inherited
+answers to controls; individual exceptions, including explicit unknowns, always
+take precedence. A group No records a gap without inventing individual failures.
+Any known gap keeps the group No; otherwise an unknown keeps it unverified;
+mixed Yes/N/A is Yes and all N/A is N/A. Clearing a group decision preserves
+individual findings and notes. Progress shows both grouped question outcomes
+and underlying control answer counts. Grouping reduces repeated evidence review
+and answer entry, not the scope of verification.
+
+The experiment saves under `cra-grouped-assessment-v1` and does not copy from or
+write to either existing assessment. Shared evidence notes apply to the whole
+bundle, with individual notes and file references available. Its project-agent
+prompt includes bundle guidance and original controls, using the same strict
+JSON validation and preview-before-apply workflow. Inherited answers are kept
+unless replacement is selected. Unknown agent findings never erase answers.
+Code inspection alone cannot establish deployed behavior or operational evidence.
+
+Experimental PDF/Markdown exports retain all 18 group outcomes, 96 original
+controls, shared/individual notes and each answer's origin, even when filtered.
+Separate file references remain opt-in. Reset affects only the experiment. If
+the catalog or grouping revision changes, group decisions and individual passes
+require review again; notes and file evidence are retained.
+
 Answers, notes and project/reviewer fields are saved in browser local storage.
 They are not uploaded or shared between users or devices. Changing the origin,
 browser profile, or file location may make an earlier assessment unavailable.
@@ -145,6 +175,12 @@ unchanged. `detailed-verification.css` supplies scoped styles and accessible
 tab visibility. All new runtime assets are included by the existing packaging
 workflow without a build step.
 
+`grouped-catalog.js` defines the 18 experimental bundles and conservative answer
+aggregation; `grouped-verification.js` owns the third panel, separate state,
+agent review and exports; `grouped-verification.css` styles the experiment.
+Shared tab navigation supports all three panels with arrow keys, Home and End.
+The original general bundle and detailed catalog/report/agent helpers are unchanged.
+
 The catalog provides focused English developer security controls. Repeated
 artifacts (such as an SBOM) are referenced across distinct lifecycle activities
 instead of requesting duplicate evidence. Critical, High
@@ -162,6 +198,10 @@ independent resets and both tabs' downloads. It writes reports and desktop/mobil
 screenshots to a temporary directory printed on completion. It does not deploy.
 Run `node tests/agent-review.cjs` for dependency-free prompt, JSON validation,
 atomic merge, relative-path and Markdown evidence-inclusion checks.
+Run `node tests/grouped-verification.cjs` with the same Playwright setup for
+one-to-one control coverage, conservative group/exception outcomes, three-tab
+navigation, persistence, isolated reset, agent import protection, PDF/Markdown
+exports, optional file evidence and desktop/mobile screenshots.
 
 ## Third-Party Materials
 
