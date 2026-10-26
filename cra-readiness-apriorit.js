@@ -11,6 +11,7 @@
   };
   let fontsPromise;
   let exporting = false;
+  let liveAssessment;
 
   async function loadFonts() {
     if (!fontsPromise) {
@@ -43,6 +44,7 @@
   }
 
   function readAssessment() {
+    const panel = document.getElementById("general-verification-panel") || document.querySelector(".workspace");
     let state = { product: "", reviewer: "", answers: {}, notes: {} };
     try {
       const saved = JSON.parse(localStorage.getItem("cra-readiness-assessment-v1") || "null");
@@ -51,18 +53,33 @@
       state.answers = {};
       state.notes = {};
     }
-    state.answers = { ...state.answers };
-    state.notes = { ...state.notes };
-    state.product = document.querySelector('.metadata-fields input')?.value || "";
-    state.reviewer = document.querySelectorAll('.metadata-fields input')[1]?.value || "";
-    for (const article of document.querySelectorAll('.requirement')) {
+    // Storage may fail while React still holds a complete assessment in memory.
+    // Keep inputs seen before filtering so exports do not depend on persistence.
+    if (liveAssessment) state = { ...state, ...liveAssessment };
+    state.answers = Object.fromEntries(Object.entries(state.answers || {}).filter(([key, value]) => /^\d+$/.test(key) && Number(key) < 10 && statuses.slice(0, 4).includes(value)));
+    state.notes = Object.fromEntries(Object.entries(state.notes || {}).filter(([key, value]) => /^\d+$/.test(key) && Number(key) < 10 && typeof value === "string"));
+    state.product = panel.querySelector('.metadata-fields input')?.value || "";
+    state.reviewer = panel.querySelectorAll('.metadata-fields input')[1]?.value || "";
+    for (const article of panel.querySelectorAll('.requirement')) {
       const index = Number(article.id.replace("requirement-", "")) - 1;
       const answer = article.querySelector('input:checked');
       if (answer) state.answers[index] = answer.value;
       state.notes[index] = article.querySelector('textarea')?.value || "";
     }
+    liveAssessment = { ...state, answers: { ...state.answers }, notes: { ...state.notes } };
     return state;
   }
+
+  for (const type of ["input", "change"]) {
+    document.addEventListener(type, event => {
+      if (event.target.closest("#general-verification-panel")) readAssessment();
+    }, true);
+  }
+  document.addEventListener("click", event => {
+    if (event.target.closest(".modal .button.danger") && document.getElementById("reset-title")) {
+      liveAssessment = { product: "", reviewer: "", answers: {}, notes: {} };
+    }
+  }, true);
 
   async function createReport(state, includeAppendix) {
     const { requirements, regulation, originalExport } = window.CRAReadiness;
@@ -195,7 +212,7 @@
         }
       }
       section("Important exceptions");
-      for (const exception of document.querySelectorAll(".exception-grid section")) {
+      for (const exception of document.querySelectorAll("#general-verification-panel .exception-grid section")) {
         ensure(28);
         text(exception.querySelector("h4").textContent, { size: 11, bold: true });
         text(exception.querySelector("p").textContent, { size: 10 });
@@ -235,7 +252,7 @@
   }
 
   document.addEventListener("click", async event => {
-    const button = event.target.closest(".export-card button");
+    const button = event.target.closest("#general-verification-panel .export-card button");
     if (!button || !button.textContent.includes("Download PDF")) return;
     event.preventDefault();
     event.stopImmediatePropagation();

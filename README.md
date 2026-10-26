@@ -48,6 +48,22 @@ There is no service worker or automatic offline caching of a hosted site.
 
 ## Data And Features
 
+The **General verification** tab retains the ten readiness requirements and its
+existing answer choices. **Detailed verification** adds a grouped developer
+security assessment with Yes / No / Not applicable answers, evidence notes
+(collapsed by default), engineering priorities, applicability guidance and
+source references. It covers
+software, firmware and qualifying product backends; conditional controls remain
+visible so reviewers can assess applicability. N/A reasons are optional.
+
+Each tab has independent project/reviewer fields, answers, notes, progress,
+reset and PDF/Markdown downloads. General data retains its original
+`cra-readiness-assessment-v1` storage key; detailed data uses
+`cra-detailed-assessment-v1` and stable control IDs. Filters affect only the view;
+reports always contain every control. Progress is the number reviewed, including
+N/A, and is not a compliance score. Unresolved priority counts include No and
+unanswered items, excluding N/A.
+
 Answers, notes and project/reviewer fields are saved in browser local storage.
 They are not uploaded or shared between users or devices. Changing the origin,
 browser profile, or file location may make an earlier assessment unavailable.
@@ -68,6 +84,31 @@ This repository contains the prebuilt runtime bundle and PDF font data. The
 original development sources, `vendor/`, `app-entry.js` and `build.mjs` are not
 included, so there is no source rebuild command to run here. Deployment uses
 the existing bundle directly.
+
+The new feature is maintained directly in readable scripts:
+`cra-readiness-assets/detailed-catalog.js` holds the versioned control catalog and
+CRA/engineering references;
+`detailed-verification.js` owns the independent panel and state;
+`detailed-report.js` owns its browser-local exports. The original bundle is
+unchanged. `detailed-verification.css` supplies scoped styles and accessible
+tab visibility. All new runtime assets are included by the existing packaging
+workflow without a build step.
+
+The catalog provides focused English developer security controls. Repeated
+artifacts (such as an SBOM) are referenced across distinct lifecycle activities
+instead of requesting duplicate evidence. Critical, High
+and Medium express engineering priority, not statutory product classifications
+or permission to omit applicable obligations. CRA outcomes, supporting
+engineering practices and contractual processes have separate basis labels.
+
+Run `node tests/verification.cjs` with the `playwright` package and Chrome
+available. If Playwright is installed outside the normal Node resolution path,
+set `PLAYWRIGHT_MODULE` to its absolute package directory. Set
+`PLAYWRIGHT_CHANNEL` to another installed Playwright browser channel if needed.
+The suite serves an isolated local preview under `/cra-checklist/`, checks
+catalog coverage, browser interactions, saving, storage failure,
+independent resets and both tabs' downloads. It writes reports and desktop/mobile
+screenshots to a temporary directory printed on completion. It does not deploy.
 
 ## Third-Party Materials
 
