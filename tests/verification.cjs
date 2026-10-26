@@ -13,6 +13,13 @@ vm.runInNewContext(fs.readFileSync(path.join(repo, "cra-readiness-assets/detaile
 const catalog = context.window.CRADetailedCatalog;
 assert.ok(catalog.items.length >= 80 && catalog.items.length <= 120);
 assert.equal(catalog.categories.length, 12);
+assert.equal(catalog.items.length, 96);
+assert.equal(catalog.revision, 3);
+assert.equal(catalog.items.filter(item => item.reviewRevision === 3).length, 6);
+assert.equal(catalog.items.reduce((count, item) => count + item.mergedFrom.length, 0), 12);
+for (const item of catalog.items) {
+  for (const former of item.mergedFrom) assert.ok(!catalog.items.some(control => control.id === former.id), `Retired control still displayed: ${former.id}`);
+}
 assert.equal(new Set(catalog.items.map(item => item.id)).size, catalog.items.length);
 assert.equal(new Set(catalog.items.map(item => item.title.toLowerCase())).size, catalog.items.length);
 for (const item of catalog.items) {
@@ -159,6 +166,71 @@ const server = http.createServer((req, res) => {
     await page.getByRole("tab", { name: /Detailed verification/ }).click();
     assert.equal(await detail.locator("[data-field=product]").inputValue(), "");
     assert.equal(await detail.locator("[data-count=reviewed]").innerText(), "0");
+    // Realistic pre-consolidation assessments must not silently promote partial passes.
+    await page.evaluate(() => localStorage.setItem("cra-detailed-assessment-v1", JSON.stringify({
+      version: 1, product: "Legacy assessment", reviewer: "Prior reviewer",
+      answers: {
+        "risk-assessment-current": "Yes", "trust-boundaries-threats": "No", "security-design-decisions": "Yes",
+        "security-requirements-acceptance": "Yes", "annex-requirement-mapping": "Yes", "contract-security-deliverables": "Yes",
+        "role-function-controls": "Yes", "server-side-authorization": "Yes",
+        "least-privilege-runtime": "Yes", "service-identities-scoped": "Yes",
+        "data-at-rest-protection": "Yes", "device-local-secret-protection": "No",
+        "default-services-minimized": "Not applicable", "platform-hardening": "Not applicable",
+        "regular-security-testing": "Yes", "secure-sdlc-operational": "No", "vulnerability-remediation-timely": "No",
+        "production-debug-disabled": "Yes", "physical-debug-access": "Not applicable"
+      },
+      notes: { "risk-assessment-current": "R".repeat(9990) + "RISK-END", "trust-boundaries-threats": "T".repeat(9990) + "THREAT-END", "security-design-decisions": "D".repeat(9990) + "DESIGN-END", "server-side-authorization": "Prior authorization evidence" }
+    })));
+    await page.reload();
+    await page.getByRole("tab", { name: /Detailed verification/ }).click();
+    assert.equal(await card("risk-assessment-current").getByRole("radio", { name: "No", exact: true }).isChecked(), true);
+    assert.equal(await card("security-requirements-acceptance").getByRole("radio", { name: "Yes", exact: true }).isChecked(), true);
+    assert.equal(await card("role-function-controls").locator("input:checked").count(), 0);
+    assert.equal(await card("least-privilege-runtime").getByRole("radio", { name: "Yes", exact: true }).isChecked(), true);
+    assert.equal(await card("data-at-rest-protection").getByRole("radio", { name: "No", exact: true }).isChecked(), true);
+    assert.equal(await card("default-services-minimized").getByRole("radio", { name: "Not applicable", exact: true }).isChecked(), true);
+    assert.equal(await card("regular-security-testing").getByRole("radio", { name: "No", exact: true }).isChecked(), true);
+    assert.equal(await card("vulnerability-remediation-timely").getByRole("radio", { name: "No", exact: true }).isChecked(), true);
+    assert.equal(await card("production-debug-disabled").getByRole("radio", { name: "Yes", exact: true }).isChecked(), true);
+    const migratedNotes = await card("risk-assessment-current").locator("textarea").inputValue();
+    assert.ok(migratedNotes.includes("RISK-END") && migratedNotes.includes("THREAT-END") && migratedNotes.includes("DESIGN-END"));
+    assert.ok(migratedNotes.length > 30000, "All three long source notes must survive consolidation");
+    assert.equal(await detail.locator(".dv-control").count(), 96);
+    assert.equal(await detail.locator(".dv-migration-notice").isVisible(), true);
+    assert.equal(await card("risk-assessment-current").locator("textarea").isVisible(), false);
+    await page.reload();
+    await page.getByRole("tab", { name: /Detailed verification/ }).click();
+    assert.equal(await card("risk-assessment-current").locator("textarea").inputValue(), migratedNotes, "Migration must be idempotent");
+    const mergedMdDownload = page.waitForEvent("download");
+    await detail.getByRole("button", { name: "Download Markdown", exact: true }).click();
+    await (await mergedMdDownload).saveAs(path.join(output, "consolidated.md"));
+    assert.ok(fs.readFileSync(path.join(output, "consolidated.md"), "utf8").includes("THREAT-END"));
+    // Expanded evidence requirements invalidate only old passes, without re-running consolidation.
+    const expandedIds = catalog.items.filter(item => item.reviewRevision === 3).map(item => item.id);
+    await page.evaluate(ids => localStorage.setItem("cra-detailed-assessment-v1", JSON.stringify({
+      version: 1, catalogRevision: 2, product: "Revision 2 assessment", reviewer: "Existing reviewer",
+      answers: { ...Object.fromEntries(ids.map(id => [id, "Yes"])), "risk-assessment-current": "Yes", "default-services-minimized": "Not applicable", "data-at-rest-protection": "No" },
+      notes: { "sbom-release-specific": "S".repeat(9990) + "SBOM-END", "regular-security-testing": "C".repeat(21000) + "SCANS-END", "risk-assessment-current": "R".repeat(30000) + "RISK-HISTORY-END" }
+    })), expandedIds);
+    await page.reload();
+    await page.getByRole("tab", { name: /Detailed verification/ }).click();
+    for (const id of expandedIds) {
+      assert.equal(await card(id).locator("input:checked").count(), 0, `Expanded control must require review: ${id}`);
+      assert.ok((await card(id).locator("textarea").inputValue()).includes("Previous answer: Yes before catalog revision 3"));
+    }
+    assert.equal(await card("risk-assessment-current").getByRole("radio", { name: "Yes", exact: true }).isChecked(), true);
+    assert.equal(await card("risk-assessment-current").locator("textarea").inputValue(), "R".repeat(30000) + "RISK-HISTORY-END");
+    assert.ok((await card("sbom-release-specific").locator("textarea").inputValue()).endsWith("SBOM-END"));
+    const expandedNotes = await card("regular-security-testing").locator("textarea").inputValue();
+    assert.ok(expandedNotes.endsWith("SCANS-END"));
+    assert.equal(await detail.locator(".dv-control").count(), 96);
+    assert.equal(await card("default-services-minimized").getByRole("radio", { name: "Not applicable", exact: true }).isChecked(), true);
+    assert.equal(await card("data-at-rest-protection").getByRole("radio", { name: "No", exact: true }).isChecked(), true);
+    await card("sbom-release-specific").getByRole("radio", { name: "Yes", exact: true }).check();
+    await page.reload();
+    await page.getByRole("tab", { name: /Detailed verification/ }).click();
+    assert.equal(await card("sbom-release-specific").getByRole("radio", { name: "Yes", exact: true }).isChecked(), true);
+    assert.equal(await card("regular-security-testing").locator("textarea").inputValue(), expandedNotes, "Revision 3 review migration must be idempotent");
     const blocked = await browser.newContext();
     await blocked.addInitScript(() => { Storage.prototype.getItem = Storage.prototype.setItem = () => { throw new DOMException("Blocked", "SecurityError"); }; });
     const blockedPage = await blocked.newPage();

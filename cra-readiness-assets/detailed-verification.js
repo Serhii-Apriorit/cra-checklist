@@ -5,8 +5,10 @@
   if (!catalog) return;
   const storageKey = "cra-detailed-assessment-v1";
   const choices = ["Yes", "No", "Not applicable"];
-  const empty = () => ({ version: 1, product: "", reviewer: "", answers: {}, notes: {}, updated: "" });
+  const empty = () => ({ version: 1, catalogRevision: catalog.revision, product: "", reviewer: "", answers: {}, notes: {}, updated: "" });
+  const noteLimit = item => 10000 * (1 + (item.mergedFrom?.length || 0)) + (item.mergedFrom?.length ? 2048 : 0) + (item.reviewRevision ? 2048 : 0);
   let saveAvailable = true;
+  let migrationNotice = "";
   let state = restore();
   let activeTab = "general";
   let mountPoint;
@@ -15,18 +17,59 @@
   let groups = new Map();
   let filters = { search: "", category: "all", priority: "all", answer: "all" };
 
+  function consolidateSavedAssessment(saved) {
+    // Consolidation happened in revision 2; later wording updates must not merge history again.
+    if (saved.catalogRevision >= 2) return saved;
+    const answers = { ...saved.answers };
+    const notes = { ...saved.notes };
+    let changed = false;
+    for (const item of catalog.items.filter(item => item.mergedFrom?.length)) {
+      const members = [{ id: item.id, label: item.title }, ...item.mergedFrom];
+      if (!members.some(member => choices.includes(answers[member.id]) || typeof notes[member.id] === "string" && notes[member.id])) continue;
+      changed = true;
+      const previous = members.map(member => ({ ...member, answer: choices.includes(answers[member.id]) ? answers[member.id] : "Unanswered", note: typeof notes[member.id] === "string" ? notes[member.id].slice(0, 10000) : "" }));
+      // A previous pass for only part of a merged control must never become a pass for all of it.
+      let answer;
+      if (previous.some(member => member.answer === "No")) answer = "No";
+      else if (previous.every(member => member.answer === "Not applicable")) answer = "Not applicable";
+      else if (previous.every(member => member.answer === "Yes" || member.answer === "Not applicable")) answer = "Yes";
+      for (const member of members) { delete answers[member.id]; delete notes[member.id]; }
+      if (answer) answers[item.id] = answer;
+      notes[item.id] = "Previous responses preserved after checklist consolidation. Review the combined control before changing its answer.\n\n" + previous.map(member => `${member.label}\nPrevious answer: ${member.answer}${member.note ? `\n${member.note}` : ""}`).join("\n\n");
+    }
+    if (changed) migrationNotice = "The checklist has been consolidated. Previous responses and notes are preserved under the combined controls. Review any merged controls now shown as unanswered.";
+    return { ...saved, answers, notes, catalogRevision: 2 };
+  }
+
+  function reviewExpandedControls(saved) {
+    const answers = { ...saved.answers };
+    const notes = { ...saved.notes };
+    const expanded = catalog.items.filter(item => item.reviewRevision > (saved.catalogRevision || 0) && answers[item.id] === "Yes");
+    for (const item of expanded) {
+      delete answers[item.id];
+      const previousNote = typeof notes[item.id] === "string" ? notes[item.id] : "";
+      notes[item.id] = `Previous answer: Yes before catalog revision ${item.reviewRevision}. This control now requires additional verification. Review the updated guidance before answering again.${previousNote ? `\n\n${previousNote}` : ""}`;
+    }
+    if (expanded.length) {
+      migrationNotice = [migrationNotice, `${expanded.length} previously satisfied controls now have expanded verification requirements and are unanswered for review. Their previous Yes answers and evidence are preserved in notes.`].filter(Boolean).join(" ");
+    }
+    return { ...saved, answers, notes, catalogRevision: catalog.revision };
+  }
+
   function restore() {
     const result = empty();
     try {
-      const saved = JSON.parse(localStorage.getItem(storageKey) || "null");
+      let saved = JSON.parse(localStorage.getItem(storageKey) || "null");
       if (!saved || typeof saved !== "object" || saved.version !== 1) return result;
+      saved = consolidateSavedAssessment(saved);
+      saved = reviewExpandedControls(saved);
       for (const field of ["product", "reviewer"]) {
         if (typeof saved[field] === "string") result[field] = saved[field].slice(0, 300);
       }
       if (typeof saved.updated === "string") result.updated = saved.updated;
       for (const item of catalog.items) {
         if (choices.includes(saved.answers?.[item.id])) result.answers[item.id] = saved.answers[item.id];
-        if (typeof saved.notes?.[item.id] === "string") result.notes[item.id] = saved.notes[item.id].slice(0, 10000);
+        if (typeof saved.notes?.[item.id] === "string") result.notes[item.id] = saved.notes[item.id].slice(0, noteLimit(item));
       }
     } catch (error) {
       // Invalid JSON is recoverable; blocked storage must remain visible to the user.
@@ -185,7 +228,7 @@
     const notesSummary = el("summary", "", state.notes[item.id] ? "Edit evidence / notes" : "Add evidence / notes");
     const notes = el("textarea");
     notes.rows = 2;
-    notes.maxLength = 10000;
+    notes.maxLength = noteLimit(item);
     notes.id = `evidence-${item.id}`;
     notes.value = state.notes[item.id] || "";
     notes.placeholder = "Link to evidence, describe a gap, or explain why this does not apply…";
@@ -286,6 +329,7 @@
     cancel.autofocus = true;
     actions.append(cancel, button("Clear detailed assessment", "button primary", () => {
       state = empty();
+      migrationNotice = "";
       filters = { search: "", category: "all", priority: "all", answer: "all" };
       save(); dialog.close(); render();
       mountPoint.querySelector("h2").focus();
@@ -338,7 +382,12 @@
     headingRow.append(heading, saved);
     const meta = el("div", "dv-metadata");
     meta.append(field("Product / project (optional)", "product", "e.g. Acme Platform"), field("Reviewer (optional)", "reviewer", "Your name or team"));
-    intro.append(headingRow, el("p", "", "Check the implementation and evidence for each control. Yes means the control is satisfied; No records a gap. Use Not applicable for controls outside your product’s context. Reasons and evidence are optional."), meta);
+    intro.append(headingRow, el("p", "", `${catalog.answerGuidance} Evidence and notes are optional.`), meta);
+    if (migrationNotice) {
+      const notice = el("p", "dv-migration-notice", migrationNotice);
+      notice.setAttribute("role", "status");
+      intro.append(notice);
+    }
     const guide = el("details", "dv-priority-guide");
     guide.append(el("summary", "", "About importance and applicability"), el("p", "", "Critical: failures can directly enable compromise, privileged access or untrusted releases. High: substantial protection against likely threats. Medium: supporting assurance, documentation or operations."), el("p", "", "Priorities are engineering guidance, separate from CRA product classifications and legal applicability. A Medium priority does not make an applicable obligation optional. Conditional web, desktop, mobile, firmware and backend controls remain visible; assess applicability using the product risk assessment."), el("p", "", "This review expands CRA security outcomes into practical checks. The general tab covers wider manufacturer readiness. Completing either assessment is not certification or a legal determination."));
     intro.append(guide);

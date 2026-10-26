@@ -55,6 +55,30 @@ security assessment with Yes / No / Not applicable answers, evidence notes
 source references. It covers
 software, firmware and qualifying product backends; conditional controls remain
 visible so reviewers can assess applicability. N/A reasons are optional.
+Choose Yes only after all applicable checks for an item are verified, No if any
+applicable check fails or a required control is missing, and Not applicable only
+if the entire item is outside the product context. Leave unreviewed items
+unanswered. Related controls distinguish mechanisms, trust boundaries and
+lifecycle stages; shared evidence can support more than one item.
+
+The detailed catalog contains 96 controls after consolidating repeated risk
+reviews, requirements matrices, authorization checks, platform/debug reviews,
+identity/storage protection and alert-response checks. Each combined control
+retains the applicable scenarios from its former items. Catalog revision 2
+migrates existing assessments: any previous No keeps the combined answer No;
+Yes requires every constituent answer to be Yes or N/A, with at least one Yes;
+all N/A stays N/A; incomplete combinations become unanswered. Previous answers
+and notes are retained together in the combined control's notes. Expanded note
+limits prevent consolidation from truncating existing evidence.
+
+Catalog revision 3 strengthens six existing controls: automated and complete
+release SBOMs, required CI scans, enforced security gates and exceptions,
+authenticated artifact provenance, measured vulnerability-response targets and
+release-linked handoff evidence. These are engineering verification details;
+project policy remains distinct from legal requirements and reporting clocks.
+Earlier Yes answers for these expanded controls become unanswered for review,
+with the previous response and all evidence retained in notes. Other answers
+and control IDs are preserved; the checklist still contains 96 controls.
 
 Each tab has independent project/reviewer fields, answers, notes, progress,
 reset and PDF/Markdown downloads. General data retains its original

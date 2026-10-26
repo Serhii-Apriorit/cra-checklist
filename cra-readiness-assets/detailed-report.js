@@ -46,8 +46,9 @@
       `**Product / project:** ${md(state.product || "Not specified")}`,
       `**Reviewer:** ${md(state.reviewer || "Not specified")}`,
       `**Updated:** ${md(state.updated || "Not recorded")}`,
-      `**Catalog version:** ${md(catalog.version || "Not specified")}`, "",
+      `**Catalog version:** ${md(catalog.version || "Not specified")} (revision ${md(catalog.revision || 1)})`, "",
       "> Engineering readiness aid. Priority labels guide engineering work and are not legal classifications. This self-assessment is not a conformity assessment, legal determination, or certification.", "",
+      ...(catalog.answerGuidance ? [md(catalog.answerGuidance), ""] : []),
       "## Summary", "",
       `- Reviewed: **${reviewed} / ${total}**`,
       `- Yes: **${counts.Yes}**`, `- No: **${counts.No}**`,
@@ -158,8 +159,9 @@
     label("Product / project"); text(state.product || "Not specified", { size: 12, bold: true });
     label("Reviewer"); text(state.reviewer || "Not specified");
     label("Last updated"); text(state.updated || "Not recorded");
-    text(`Catalog version: ${catalog.version || "Not specified"}`, { size: 9, color: "#626262" });
+    text(`Catalog version: ${catalog.version || "Not specified"} (revision ${catalog.revision || 1})`, { size: 9, color: "#626262" });
     text("Engineering priority labels guide engineering work and are not legal classifications. This self-assessment is not a conformity assessment, legal determination, or certification.", { size: 9, color: "#626262", gap: 5 });
+    if (catalog.answerGuidance) text(catalog.answerGuidance, { size: 9, color: "#626262", gap: 5 });
     section("Summary");
     text(`Reviewed: ${summary.reviewed} / ${summary.total}    Yes: ${summary.counts.Yes}    No: ${summary.counts.No}`, { size: 10, bold: true });
     text(`Not applicable: ${summary.counts["Not applicable"]}    Unanswered: ${summary.counts.Unanswered}`, { size: 10 });
