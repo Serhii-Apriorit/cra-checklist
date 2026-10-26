@@ -2,7 +2,37 @@
 
 ## Deployment
 
-Extract `cra-readiness-site.zip` into a static hosting directory. `index.html`,
+### GitHub Pages
+
+The repository includes a manually triggered deployment workflow at
+`.github/workflows/pages.yml`. It publishes the checked-in static files without
+installing dependencies or rebuilding the application. Pushes and pull requests
+do not deploy the site.
+
+1. Commit and push these files to the repository's default branch.
+2. In **Settings → Pages → Build and deployment**, set **Source** to
+   **GitHub Actions**.
+3. When ready to publish, open **Actions → Deploy to GitHub Pages → Run
+   workflow**, select the default branch, and run it. This publishes the site.
+4. Open the URL shown in the successful deployment or in **Settings → Pages**.
+   Without a custom domain, this repository's URL is
+   `https://serhii-apriorit.github.io/cra-checklist/`.
+
+Run the workflow again explicitly whenever you want to publish updated files.
+It uses the built-in `GITHUB_TOKEN`; no personal access token is required.
+Only `index.html`, `cra-readiness-apriorit.js` and `cra-readiness-assets/` are
+included in the published artifact. Relative asset URLs support the repository
+subdirectory without a base-path setting or routing fallback.
+
+For a private repository, its owner needs GitHub Pro, Team or Enterprise.
+The published site is normally public even when its source repository is private;
+private Pages sites require an organization using GitHub Enterprise Cloud.
+See [GitHub Pages setup](https://docs.github.com/en/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site)
+and [plan availability](https://docs.github.com/en/pages/getting-started-with-github-pages/creating-a-github-pages-site).
+
+### Other static hosts
+
+Copy the runtime files into a static hosting directory. `index.html`,
 `cra-readiness-apriorit.js` and `cra-readiness-assets/` must remain together.
 The site can be served from the domain root or a subdirectory. No Node.js,
 database, API server, credentials or build step are needed on the host.
@@ -29,28 +59,15 @@ browser. PDF fonts include Cyrillic support. Keep all bundled files and license
 notices when distributing the site. This is a readiness self-assessment, not a
 conformity assessment, certification or legal determination.
 
-## Source Rebuild
+## Local Preview And Source Rebuild
 
-In the development workspace, sources are retained under
-`cra-readiness-assets/vendor/`; `app-entry.js` exports their local interfaces.
-The deployment archive contains only runtime files, not these source files.
+To preview the checked-in site, serve the repository with any static HTTP server,
+for example `python3 -m http.server 8000`, then open `http://localhost:8000/`.
 
-From the workspace root:
-
-```sh
-node cra-readiness-assets/build.mjs
-node cra-readiness-assets/build.mjs --package
-```
-
-These commands require Node.js and npm; packaging also requires `zip`.
-The build uses esbuild 0.25.12 through `npx`, which may need Internet access
-on the build machine. Rebuilding does not fetch application code from AppDeploy.
-The locally retained sources are compiled into one browser script. PDF font data
-is generated from the local Noto Sans TTF files.
-
-The upstream html2canvas source produces a duplicate-case warning during build;
-this source was retained unchanged. The application's export workflows were
-tested with remote requests blocked.
+This repository contains the prebuilt runtime bundle and PDF font data. The
+original development sources, `vendor/`, `app-entry.js` and `build.mjs` are not
+included, so there is no source rebuild command to run here. Deployment uses
+the existing bundle directly.
 
 ## Third-Party Materials
 
