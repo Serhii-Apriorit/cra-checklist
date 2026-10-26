@@ -2,13 +2,15 @@
 (() => {
   "use strict";
   const catalog = window.CRADetailedCatalog;
-  if (!catalog) return;
+  const agent = window.CRADetailedAgent;
+  if (!catalog || !agent) return;
   const storageKey = "cra-detailed-assessment-v1";
   const choices = ["Yes", "No", "Not applicable"];
-  const empty = () => ({ version: 1, catalogRevision: catalog.revision, product: "", reviewer: "", answers: {}, notes: {}, updated: "" });
+  const empty = () => ({ version: 1, catalogRevision: catalog.revision, product: "", reviewer: "", answers: {}, notes: {}, fileEvidence: {}, includeFileEvidence: false, updated: "" });
   const noteLimit = item => 10000 * (1 + (item.mergedFrom?.length || 0)) + (item.mergedFrom?.length ? 2048 : 0) + (item.reviewRevision ? 2048 : 0);
   let saveAvailable = true;
   let migrationNotice = "";
+  let assistanceNotice = "";
   let state = restore();
   let activeTab = "general";
   let mountPoint;
@@ -67,9 +69,12 @@
         if (typeof saved[field] === "string") result[field] = saved[field].slice(0, 300);
       }
       if (typeof saved.updated === "string") result.updated = saved.updated;
+      result.includeFileEvidence = saved.includeFileEvidence === true;
       for (const item of catalog.items) {
         if (choices.includes(saved.answers?.[item.id])) result.answers[item.id] = saved.answers[item.id];
         if (typeof saved.notes?.[item.id] === "string") result.notes[item.id] = saved.notes[item.id].slice(0, noteLimit(item));
+        const evidence = agent.sanitizeEvidence(saved.fileEvidence?.[item.id]);
+        if (evidence.length) result.fileEvidence[item.id] = evidence;
       }
     } catch (error) {
       // Invalid JSON is recoverable; blocked storage must remain visible to the user.
@@ -206,7 +211,7 @@
       if (!card.hidden) answers.querySelector("input").focus();
     });
     answers.append(clear);
-    const naHint = el("p", "dv-na-hint", "Why does this control not apply? You can record an optional justification in evidence / notes below.");
+    const naHint = el("p", "dv-na-hint", "Why does this control not apply? You can record an optional justification in notes below.");
     const details = el("details", "dv-guidance");
     details.append(el("summary", "", "How to verify / evidence"));
     for (const [heading, text] of [["How to verify", item.guidance], ["Evidence examples", item.evidence], ["Applicability", item.applicability], ["Basis", item.basis]]) {
@@ -223,26 +228,174 @@
       refs.append(a);
     }
     details.append(refs);
-    const notesLabel = el("label", "dv-notes-label", "Evidence / notes (optional)");
+    const notesLabel = el("label", "dv-notes-label", "Review notes (optional)");
     const notesSection = el("details", "dv-notes");
-    const notesSummary = el("summary", "", state.notes[item.id] ? "Edit evidence / notes" : "Add evidence / notes");
+    const notesSummary = el("summary", "", state.notes[item.id] ? "Edit notes" : "Add notes");
     const notes = el("textarea");
     notes.rows = 2;
     notes.maxLength = noteLimit(item);
     notes.id = `evidence-${item.id}`;
     notes.value = state.notes[item.id] || "";
-    notes.placeholder = "Link to evidence, describe a gap, or explain why this does not apply…";
+    notes.placeholder = "Explain the result, describe a gap, or justify N/A. Put project paths and line numbers under File evidence.";
     notes.addEventListener("input", () => {
       state.notes[item.id] = notes.value;
-      notesSummary.textContent = notes.value ? "Edit evidence / notes" : "Add evidence / notes";
+      notesSummary.textContent = notes.value ? "Edit notes" : "Add notes";
       save();
     });
     notesLabel.append(notes);
     notesSection.append(notesSummary, notesLabel);
-    card.append(top, title, answers, naHint, details, notesSection);
+    card.append(top, title, answers, naHint, details, notesSection, createFileEvidence(item));
     cards.set(item.id, card);
     updateCard(item);
     return card;
+  }
+
+  function createFileEvidence(item) {
+    const section = el("details", "dv-file-evidence");
+    const heading = el("summary");
+    const list = el("ul", "dv-file-list");
+    const form = el("form", "dv-file-form");
+    const pathLabel = el("label", "dv-field", "Relative path");
+    const path = el("input"); path.type = "text"; path.required = true; path.maxLength = 500; path.placeholder = "src/auth/session.ts";
+    pathLabel.append(path);
+    const lineLabel = el("label", "dv-field", "Line number");
+    const line = el("input"); line.type = "number"; line.min = "1"; line.max = "10000000"; line.step = "1"; line.required = true;
+    lineLabel.append(line);
+    const descriptionLabel = el("label", "dv-field dv-file-description", "What this supports (optional)");
+    const description = el("input"); description.type = "text"; description.maxLength = 1000; description.placeholder = "Session expiry is enforced here";
+    descriptionLabel.append(description);
+    const add = el("button", "button secondary", "Add file evidence"); add.type = "submit";
+    const message = el("p", "dv-file-status"); message.setAttribute("role", "status");
+    form.append(pathLabel, lineLabel, descriptionLabel, add, message);
+    const refresh = () => {
+      const entries = state.fileEvidence[item.id] || [];
+      heading.textContent = `File evidence (${entries.length})`;
+      list.replaceChildren();
+      for (const [index, entry] of entries.entries()) {
+        const row = el("li", "dv-file-entry");
+        const body = el("div"); body.append(el("code", "", `${entry.path}:${entry.line}`));
+        if (entry.description) body.append(el("p", "", entry.description));
+        const remove = button("Remove", "dv-clear", () => {
+          state.fileEvidence[item.id] = entries.filter((value, position) => position !== index);
+          save(); refresh();
+          path.focus();
+        });
+        remove.setAttribute("aria-label", `Remove file evidence ${entry.path}:${entry.line}`);
+        row.append(body, remove); list.append(row);
+      }
+    };
+    form.addEventListener("submit", event => {
+      event.preventDefault();
+      try {
+        const entry = agent.validateEvidence({ path: path.value, line: Number(line.value), description: description.value });
+        const entries = state.fileEvidence[item.id] || [];
+        if (entries.some(value => agent.evidenceKey(value) === agent.evidenceKey(entry))) throw new Error("This file evidence is already recorded.");
+        if (entries.length >= 20) throw new Error("A control can contain up to 20 file evidence entries.");
+        state.fileEvidence[item.id] = [...entries, entry];
+        save(); refresh(); form.reset();
+        message.textContent = "File evidence saved separately from notes.";
+      } catch (error) { message.textContent = error.message; }
+    });
+    section.append(heading, el("p", "dv-file-help", "Use project-relative paths and positive line numbers. File evidence is stored separately and included in reports only when selected."), list, form);
+    refresh();
+    return section;
+  }
+
+  function createAgentAssistance() {
+    const section = el("section", "dv-agent-assistance");
+    const heading = el("h3", "", "Review with your project agent");
+    heading.id = "dv-agent-heading"; section.setAttribute("aria-labelledby", heading.id);
+    section.append(heading, el("p", "", "Copy a review prompt to an agent with access to your project. Paste its JSON results here, preview them, then apply the known answers. Unverified items stay unanswered; this page does not contact an agent or upload project data."));
+    const actions = el("div", "dv-agent-actions");
+    const scopeLabel = el("label", "dv-field", "Prompt scope");
+    const scope = el("select");
+    scope.setAttribute("aria-label", "Prompt scope");
+    for (const [value, title] of [["unanswered", "Unanswered controls"], ["all", "All controls"]]) {
+      const option = el("option", "", title); option.value = value; scope.append(option);
+    }
+    scopeLabel.append(scope);
+    const promptDetails = el("details", "dv-agent-prompt");
+    promptDetails.append(el("summary", "", "View prompt / copy manually"));
+    const promptLabel = el("label", "dv-field", "Agent review prompt");
+    const promptText = el("textarea"); promptText.readOnly = true; promptText.rows = 8; promptText.spellcheck = false;
+    promptLabel.append(promptText); promptDetails.append(promptLabel);
+    const copyStatus = el("p", "dv-agent-status"); copyStatus.setAttribute("role", "status");
+    const refreshPrompt = () => {
+      const items = catalog.items.filter(item => scope.value === "all" || !state.answers[item.id]);
+      if (!items.length) {
+        promptText.value = "All controls are answered. Select All controls to request another review.";
+        return 0;
+      }
+      const prompt = agent.buildPrompt(catalog, items);
+      if (promptText.value !== prompt) promptText.value = prompt;
+      return items.length;
+    };
+    scope.addEventListener("change", refreshPrompt);
+    promptDetails.addEventListener("toggle", () => { if (promptDetails.open) refreshPrompt(); });
+    const copy = button("Copy agent prompt", "button secondary", async () => {
+      if (!refreshPrompt()) { copyStatus.textContent = "All controls are answered. Select All controls to request another review."; return; }
+      try {
+        if (!navigator.clipboard?.writeText) throw new Error("Clipboard unavailable");
+        await navigator.clipboard.writeText(promptText.value);
+        copyStatus.textContent = "Prompt copied. Give it to your project agent, then paste the JSON response below.";
+      } catch {
+        promptDetails.open = true;
+        promptText.focus(); promptText.select();
+        copyStatus.textContent = "Automatic clipboard access is unavailable. The prompt is selected; copy it manually.";
+      }
+    });
+    actions.append(scopeLabel, copy);
+    const imports = el("details", "dv-agent-import");
+    imports.append(el("summary", "", "Paste agent results"), el("p", "", "Existing answers are kept by default. Notes and file evidence are merged after you review the preview; file paths are not added to notes."));
+    const inputLabel = el("label", "dv-field", "Agent results JSON");
+    const input = el("textarea"); input.rows = 7; input.maxLength = 2000000; input.spellcheck = false;
+    input.placeholder = 'Paste the JSON object returned by the agent…'; inputLabel.append(input);
+    const overwriteLabel = el("label", "dv-checkbox");
+    const overwrite = el("input"); overwrite.type = "checkbox";
+    overwriteLabel.append(overwrite, document.createTextNode("Replace existing answers for matching controls"));
+    const status = el("p", "dv-agent-status"); status.setAttribute("role", "status");
+    const preview = el("div", "dv-import-preview"); preview.hidden = true;
+    let parsed;
+    const apply = button("Apply agent results", "button primary", () => {
+      if (!parsed) return;
+      try {
+        const merged = agent.merge(state, parsed, { overwriteAnswers: overwrite.checked, noteLimit });
+        state = merged.state;
+        assistanceNotice = `Agent results applied: ${merged.summary.answered} answers filled, ${merged.summary.preserved} existing answers kept, ${merged.summary.filesAdded} file evidence entries added. Review the imported findings before relying on them.`;
+        save(); render(); mountPoint.querySelector("h2").focus();
+      } catch (error) { status.textContent = error.message; }
+    });
+    apply.disabled = true;
+    const showPreview = () => {
+      parsed = undefined; apply.disabled = true; preview.hidden = true; preview.replaceChildren();
+      try {
+        const review = agent.parse(input.value, catalog);
+        const merged = agent.merge(state, review, { overwriteAnswers: overwrite.checked, noteLimit });
+        preview.append(el("p", "", `${review.project ? `Agent project: ${review.project}. ` : ""}${review.results.length} controls received; ${merged.summary.answered} answers will be filled, ${merged.summary.preserved} existing answers kept, ${merged.summary.filesAdded} file evidence entries added. Unknown results do not clear existing answers.`));
+        const list = el("ul", "dv-import-results");
+        for (const result of review.results) {
+          const item = catalog.items.find(item => item.id === result.id);
+          const row = el("li"); const details = el("details");
+          details.append(el("summary", "", `${item.title} — current: ${state.answers[result.id] || "Unanswered"}; agent: ${result.answer || "Unanswered"}`));
+          if (result.notes) details.append(el("p", "dv-preview-notes", result.notes));
+          for (const evidence of result.fileEvidence) details.append(el("p", "dv-preview-file", `${evidence.path}:${evidence.line}${evidence.description ? ` — ${evidence.description}` : ""}`));
+          row.append(details); list.append(row);
+        }
+        preview.append(list); preview.hidden = false; parsed = review; apply.disabled = false;
+        status.textContent = "Valid results. Review the preview before applying.";
+      } catch (error) { status.textContent = error.message; }
+    };
+    const previewButton = button("Preview agent results", "button secondary", showPreview);
+    input.addEventListener("input", () => { parsed = undefined; apply.disabled = true; preview.hidden = true; status.textContent = ""; });
+    overwrite.addEventListener("change", () => { if (parsed) showPreview(); });
+    const importActions = el("div", "dv-agent-actions"); importActions.append(previewButton, apply);
+    imports.append(inputLabel, overwriteLabel, importActions, status, preview);
+    section.append(actions, copyStatus, promptDetails, imports);
+    if (assistanceNotice) {
+      const notice = el("p", "dv-assistance-notice", assistanceNotice); notice.setAttribute("role", "status"); section.prepend(notice);
+    }
+    refreshPrompt();
+    return section;
   }
 
   function updateCard(item) {
@@ -306,8 +459,9 @@
     // Freeze the assessment at the click, even if users keep editing during font loading.
     const snapshot = JSON.parse(JSON.stringify(state));
     try {
-      if (format === "pdf") await window.CRADetailedReport.downloadPdf(snapshot, catalog);
-      else window.CRADetailedReport.downloadMarkdown(snapshot, catalog);
+      const options = { includeFileEvidence: snapshot.includeFileEvidence };
+      if (format === "pdf") await window.CRADetailedReport.downloadPdf(snapshot, catalog, options);
+      else window.CRADetailedReport.downloadMarkdown(snapshot, catalog, options);
       message.textContent = `${format === "pdf" ? "PDF" : "Markdown"} download started. All controls are included.`;
     } catch (error) {
       message.textContent = error.message || "The download could not be created. Please retry.";
@@ -330,6 +484,7 @@
     actions.append(cancel, button("Clear detailed assessment", "button primary", () => {
       state = empty();
       migrationNotice = "";
+      assistanceNotice = "";
       filters = { search: "", category: "all", priority: "all", answer: "all" };
       save(); dialog.close(); render();
       mountPoint.querySelector("h2").focus();
@@ -367,6 +522,12 @@
     progress.append(counts, unresolved, el("p", "dv-summary-foot", "Review progress, not a compliance score."));
     const exports = el("section", "dv-exports");
     exports.append(el("h3", "", "Keep your assessment"), el("p", "", "Download every control, answer, priority, reference and note."));
+    const evidenceOption = el("label", "dv-checkbox dv-export-evidence");
+    const includeEvidence = el("input"); includeEvidence.type = "checkbox"; includeEvidence.checked = state.includeFileEvidence;
+    includeEvidence.addEventListener("change", () => { state.includeFileEvidence = includeEvidence.checked; save(); });
+    evidenceOption.append(includeEvidence, document.createTextNode("Include file evidence in PDF and Markdown"));
+    exports.append(evidenceOption);
+    exports.append(el("small", "", "Review notes are always included. This option controls the separate file evidence field."));
     for (const [format, title] of [["pdf", "Download PDF"], ["md", "Download Markdown"]]) {
       const node = button(title, `button ${format === "pdf" ? "primary" : "secondary"}`, () => exportAssessment(format, node));
       exports.append(node);
@@ -401,7 +562,7 @@
       selectFilter("Answer", "answer", [["all", "All answers"], ...[...choices, "Unanswered"].map(value => [value, value])]),
       button("Clear filters", "dv-clear-filters", () => { filters = { search: "", category: "all", priority: "all", answer: "all" }; search.value = ""; for (const node of toolbar.querySelectorAll("select")) node.value = "all"; applyFilters(); }));
     const result = el("p", "dv-filter-result"); result.setAttribute("role", "status");
-    main.append(intro, toolbar, result);
+    main.append(intro, createAgentAssistance(), toolbar, result);
     for (const category of catalog.categories) {
       const group = el("section", "dv-group");
       const groupHeading = el("div", "dv-group-heading");

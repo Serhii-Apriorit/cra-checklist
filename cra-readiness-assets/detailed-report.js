@@ -37,7 +37,36 @@
     return url ? `[${label}](${url})` : label;
   };
 
-  function markdown(state = {}, catalog = {}) {
+  // Keep repository references out of reports unless the caller explicitly opts in.
+  // The local checks are intentionally repeated here so this exporter remains safe
+  // when loaded without the detailed-agent module.
+  const validEvidence = (entry) => {
+    if (!entry || typeof entry !== "object") return null;
+    const candidate = entry;
+    const path = typeof candidate.path === "string" ? clean(candidate.path).trim() : "";
+    const line = candidate.line;
+    if (!path || /[\\\u0000-\u001f\u007f]/.test(path) || path.startsWith("/") ||
+        /^[a-z][a-z0-9+.-]*:/i.test(path) || /^[a-z]:/i.test(path) ||
+        path.split("/").some(part => !part || part === "." || part === "..") ||
+        !Number.isInteger(line) || line < 1) return null;
+    const description = typeof candidate.description === "string" ? clean(candidate.description).trim() : "";
+    return { path, line, description };
+  };
+  const fileEvidenceFor = (state, id) => {
+    const entries = state?.fileEvidence?.[id];
+    if (!Array.isArray(entries)) return [];
+    const sanitize = window.CRADetailedAgent?.sanitizeEvidence;
+    if (typeof sanitize === "function") {
+      try {
+        const sanitized = sanitize(entries);
+        if (!Array.isArray(sanitized)) return [];
+        return sanitized.map(validEvidence).filter(Boolean);
+      } catch (_) { return []; }
+    }
+    return entries.map(validEvidence).filter(Boolean);
+  };
+
+  function markdown(state = {}, catalog = {}, options = { includeFileEvidence: false }) {
     const { items, counts, reviewed, total, unresolvedPriority } = countSummary(state, catalog);
     const categories = Array.isArray(catalog.categories) ? catalog.categories : [];
     const categoryTitle = Object.fromEntries(categories.map(category => [category.id, category.title]));
@@ -70,6 +99,14 @@
       if (Array.isArray(item.references) && item.references.length) {
         for (const ref of item.references) out.push(`- ${mdLink(ref)}`);
       } else out.push("- None listed");
+      const fileEvidence = options?.includeFileEvidence ? fileEvidenceFor(state, item.id) : [];
+      if (fileEvidence.length) {
+        out.push("", "**File evidence**");
+        for (const entry of fileEvidence) {
+          const detail = `${entry.path}:${entry.line}`;
+          out.push(`- ${md(detail)}${entry.description ? ` - ${md(entry.description)}` : ""}`);
+        }
+      }
       out.push("");
     }
     return out.join("\n");
@@ -94,7 +131,7 @@
     return fontsPromise;
   }
 
-  async function createPdf(state = {}, catalog = {}) {
+  async function createPdf(state = {}, catalog = {}, options = { includeFileEvidence: false }) {
     const originalExport = window.CRAReadiness?.originalExport;
     if (!originalExport?.createPdf) throw new Error("The base CRA PDF exporter is unavailable.");
     const fontData = await loadFonts();
@@ -183,6 +220,13 @@
       if (Array.isArray(item.references) && item.references.length) {
         for (const ref of item.references) text(ref.label || ref.url || "Reference", { size: 8, color: "#b33e05", gap: 1, link: ref.url || undefined });
       } else list("None listed", { size: 9, color: "#777777" });
+      const fileEvidence = options?.includeFileEvidence ? fileEvidenceFor(state, item.id) : [];
+      if (fileEvidence.length) {
+        label("File evidence");
+        for (const entry of fileEvidence) {
+          text(`${entry.path}:${entry.line}${entry.description ? ` - ${entry.description}` : ""}`, { size: 9 });
+        }
+      }
       cursor += 5;
     }
 
@@ -202,15 +246,15 @@
   function filenamePart(value) {
     return clean(value || "Assessment").normalize("NFKD").replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-|-$/g, "").slice(0, 60) || "Assessment";
   }
-  function downloadMarkdown(state, catalog) {
-    const blob = new Blob([markdown(state, catalog)], { type: "text/markdown;charset=utf-8" });
+  function downloadMarkdown(state, catalog, options = { includeFileEvidence: false }) {
+    const blob = new Blob([markdown(state, catalog, options)], { type: "text/markdown;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url; anchor.download = `Apriorit-CRA-Detailed-${filenamePart(state?.product)}.md`;
     anchor.click(); URL.revokeObjectURL(url);
   }
-  async function downloadPdf(state, catalog) {
-    const pdf = await createPdf(state, catalog);
+  async function downloadPdf(state, catalog, options = { includeFileEvidence: false }) {
+    const pdf = await createPdf(state, catalog, options);
     pdf.save(`Apriorit-CRA-Detailed-${filenamePart(state?.product)}.pdf`);
     return pdf;
   }

@@ -80,6 +80,33 @@ Earlier Yes answers for these expanded controls become unanswered for review,
 with the previous response and all evidence retained in notes. Other answers
 and control IDs are preserved; the checklist still contains 96 controls.
 
+Detailed verification includes **Review with your project agent**. Copy a prompt
+for unanswered controls (or all controls) to an agent with project access, then
+paste its JSON response, preview it and apply the results. The prompt includes
+the current questions, verification guidance, applicability and response schema.
+Unknown results stay unanswered. Existing answers are kept unless replacement is
+selected; notes and file evidence are merged without duplicating repeat imports.
+Invalid, duplicate or retired control IDs, mismatched revisions and malformed
+file references reject the whole import before any changes are applied.
+
+File evidence has its own field on each control, separate from review notes. Each
+reference contains a repository-relative `path`, positive `line` number and
+optional `description`. Paths cannot be absolute, URLs or parent traversals. File
+evidence and the export preference are saved locally with the assessment. The
+**Include file evidence in PDF and Markdown** checkbox is off by default; both
+report formats omit the separate references until explicitly selected. Review
+notes remain included. Existing notes are not automatically rewritten or parsed
+for file references.
+
+Agent responses use format `cra-detailed-agent-review`, version `1`, the current
+`catalogRevision` and a `results` array. Each result requires `id`, `answer`
+(`Yes`, `No`, `Not applicable` or `null`), `notes` and `fileEvidence`. A sparse
+array is accepted; omitted controls are preserved and null never clears an
+existing answer. An optional `project` label is shown in the preview and does not
+overwrite the human-entered project/reviewer fields. This feature uses no agent
+API, project connection or server-side upload: users choose where to copy the
+prompt and which reviewed results to bring back.
+
 Each tab has independent project/reviewer fields, answers, notes, progress,
 reset and PDF/Markdown downloads. General data retains its original
 `cra-readiness-assessment-v1` storage key; detailed data uses
@@ -133,6 +160,8 @@ The suite serves an isolated local preview under `/cra-checklist/`, checks
 catalog coverage, browser interactions, saving, storage failure,
 independent resets and both tabs' downloads. It writes reports and desktop/mobile
 screenshots to a temporary directory printed on completion. It does not deploy.
+Run `node tests/agent-review.cjs` for dependency-free prompt, JSON validation,
+atomic merge, relative-path and Markdown evidence-inclusion checks.
 
 ## Third-Party Materials
 

@@ -80,6 +80,75 @@ const server = http.createServer((req, res) => {
     assert.equal(await card(c.id).locator(".dv-na-hint").isVisible(), true);
     assert.equal(await detail.locator("[data-count=reviewed]").innerText(), "3");
     assert.equal(await detail.locator("[data-count=na]").innerText(), "1");
+    const [unknownControl, knownControl] = catalog.items.slice(3, 5);
+    await page.evaluate(() => Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: async value => { window.copiedAgentPrompt = value; } } }));
+    await detail.getByRole("button", { name: "Copy agent prompt", exact: true }).click();
+    const copiedPrompt = await page.evaluate(() => window.copiedAgentPrompt);
+    assert.ok(copiedPrompt.includes(`"id": "${unknownControl.id}"`));
+    assert.ok(!copiedPrompt.includes(`"id": "${a.id}"`), "Default prompt scope must omit answered controls");
+    await detail.getByLabel("Prompt scope", { exact: true }).selectOption("all");
+    await detail.getByRole("button", { name: "Copy agent prompt", exact: true }).click();
+    assert.ok((await page.evaluate(() => window.copiedAgentPrompt)).includes(`"id": "${a.id}"`));
+    await page.evaluate(() => Object.defineProperty(navigator, "clipboard", { configurable: true, value: undefined }));
+    await detail.getByRole("button", { name: "Copy agent prompt", exact: true }).click();
+    assert.equal(await detail.getByLabel("Agent review prompt", { exact: true }).isVisible(), true);
+    assert.ok((await detail.locator(".dv-agent-status").first().innerText()).includes("copy it manually"));
+    await card(a.id).locator(".dv-notes summary").click();
+    await card(a.id).locator("textarea").fill("Human review note");
+    await card(a.id).locator(".dv-notes summary").click();
+    const agentResults = {
+      format: "cra-detailed-agent-review", version: 1, catalogRevision: catalog.revision, project: "Project review",
+      results: [
+        { id: a.id, answer: "No", notes: "Agent identified a gap", fileEvidence: [{ path: "src/agentproof.ts", line: 42, description: "FILE-PROOF-SENTINEL <img src=x onerror=window.injected=true>" }] },
+        { id: unknownControl.id, answer: null, notes: "Deployment behavior needs human verification", fileEvidence: [] },
+        { id: knownControl.id, answer: "Yes", notes: "Confirmed by project review", fileEvidence: [] }
+      ]
+    };
+    const openImport = async payload => {
+      await detail.locator(".dv-agent-import").evaluate(node => { node.open = true; });
+      await detail.getByLabel("Agent results JSON", { exact: true }).fill(JSON.stringify(payload));
+      await detail.getByRole("button", { name: "Preview agent results", exact: true }).click();
+    };
+    const beforeInvalid = await page.evaluate(() => localStorage.getItem("cra-detailed-assessment-v1"));
+    await openImport({ ...agentResults, results: [...agentResults.results, { id: "unknown-control", answer: "Yes", notes: "", fileEvidence: [] }] });
+    assert.equal(await detail.getByRole("button", { name: "Apply agent results", exact: true }).isDisabled(), true);
+    assert.equal(await page.evaluate(() => localStorage.getItem("cra-detailed-assessment-v1")), beforeInvalid, "Invalid batches must not change the assessment");
+    await openImport(agentResults);
+    assert.equal(await detail.locator("[data-count=reviewed]").innerText(), "3", "Preview must not apply answers");
+    await detail.getByRole("button", { name: "Apply agent results", exact: true }).click();
+    assert.equal(await detail.locator("[data-count=reviewed]").innerText(), "4");
+    assert.equal(await card(a.id).getByRole("radio", { name: "Yes", exact: true }).isChecked(), true);
+    assert.equal(await card(unknownControl.id).locator("input:checked").count(), 0);
+    const importedNotes = await card(a.id).locator("textarea").inputValue();
+    assert.ok(importedNotes.includes("Human review note") && importedNotes.includes("Agent identified a gap"));
+    assert.ok(!importedNotes.includes("src/agentproof.ts"));
+    assert.equal(await card(a.id).locator(".dv-file-entry").count(), 1);
+    assert.equal(await page.evaluate(() => window.injected), undefined);
+    await openImport(agentResults);
+    await detail.getByRole("button", { name: "Apply agent results", exact: true }).click();
+    assert.equal(await card(a.id).locator("textarea").inputValue(), importedNotes, "Repeated imports must not duplicate notes");
+    assert.equal(await card(a.id).locator(".dv-file-entry").count(), 1);
+    await openImport({ ...agentResults, results: [{ id: a.id, answer: "No", notes: "", fileEvidence: [] }] });
+    await detail.getByLabel("Replace existing answers for matching controls", { exact: true }).check();
+    await detail.getByRole("button", { name: "Apply agent results", exact: true }).click();
+    assert.equal(await card(a.id).getByRole("radio", { name: "No", exact: true }).isChecked(), true);
+    await card(a.id).getByRole("radio", { name: "Yes", exact: true }).check();
+    await card(knownControl.id).getByRole("button", { name: "Clear answer", exact: true }).click();
+    assert.equal(await detail.locator("[data-count=reviewed]").innerText(), "3");
+    const files = card(a.id).locator(".dv-file-evidence");
+    await files.locator("summary").click();
+    await files.getByLabel("Relative path", { exact: true }).fill("../secret");
+    await files.getByLabel("Line number", { exact: true }).fill("1");
+    await files.getByRole("button", { name: "Add file evidence", exact: true }).click();
+    assert.ok((await files.locator(".dv-file-status").innerText()).includes("repository-relative"));
+    await files.getByLabel("Relative path", { exact: true }).fill("src/manualproof.ts");
+    await files.getByLabel("Line number", { exact: true }).fill("43");
+    await files.getByRole("button", { name: "Add file evidence", exact: true }).click();
+    assert.equal(await files.locator(".dv-file-entry").count(), 2);
+    await files.getByRole("button", { name: "Remove file evidence src/manualproof.ts:43", exact: true }).click();
+    assert.equal(await files.locator(".dv-file-entry").count(), 1);
+    await files.locator("summary").click();
+    assert.equal(await detail.getByLabel("Include file evidence in PDF and Markdown", { exact: true }).isChecked(), false);
     const malicious = '<img src=x onerror="window.injection=true"> & Тест';
     await detail.locator("[data-field=product]").fill(malicious);
     await detail.locator("[data-field=reviewer]").fill("Detailed reviewer");
@@ -106,14 +175,26 @@ const server = http.createServer((req, res) => {
     assert.ok(markdown.includes("END-OF-LONG-NOTE"));
     assert.ok(!markdown.includes("<script>"));
     assert.ok(markdown.includes("&lt;script&gt;"));
+    assert.ok(!markdown.includes("agentproof") && !markdown.includes("FILE-PROOF-SENTINEL"));
     const pdfDownload = page.waitForEvent("download", { timeout: 120000 });
     await detail.getByRole("button", { name: "Download PDF", exact: true }).click();
     await (await pdfDownload).saveAs(path.join(output, "detailed.pdf"));
+    await detail.getByLabel("Include file evidence in PDF and Markdown", { exact: true }).check();
+    const evidenceMdDownload = page.waitForEvent("download");
+    await detail.getByRole("button", { name: "Download Markdown", exact: true }).click();
+    await (await evidenceMdDownload).saveAs(path.join(output, "detailed-with-file-evidence.md"));
+    const evidenceMarkdown = fs.readFileSync(path.join(output, "detailed-with-file-evidence.md"), "utf8");
+    assert.ok(evidenceMarkdown.includes("agentproof") && evidenceMarkdown.includes("FILE-PROOF-SENTINEL"));
+    const evidencePdfDownload = page.waitForEvent("download", { timeout: 120000 });
+    await detail.getByRole("button", { name: "Download PDF", exact: true }).click();
+    await (await evidencePdfDownload).saveAs(path.join(output, "detailed-with-file-evidence.pdf"));
     await page.reload();
     await page.getByRole("tab", { name: /Detailed verification/ }).click();
     assert.equal(await detail.locator("[data-field=product]").inputValue(), malicious);
     assert.equal(await card(a.id).locator("textarea").inputValue(), note);
     assert.equal(await card(a.id).locator("textarea").isVisible(), false);
+    assert.equal(await card(a.id).locator(".dv-file-entry").count(), 1);
+    assert.equal(await detail.getByLabel("Include file evidence in PDF and Markdown", { exact: true }).isChecked(), true);
     assert.equal(await detail.locator("[data-count=reviewed]").innerText(), "3");
     await detail.locator("[data-filter=answer]").selectOption("Unanswered");
     const filteredCard = detail.locator(".dv-control:visible").first();
@@ -231,6 +312,13 @@ const server = http.createServer((req, res) => {
     await page.getByRole("tab", { name: /Detailed verification/ }).click();
     assert.equal(await card("sbom-release-specific").getByRole("radio", { name: "Yes", exact: true }).isChecked(), true);
     assert.equal(await card("regular-security-testing").locator("textarea").inputValue(), expandedNotes, "Revision 3 review migration must be idempotent");
+    await page.evaluate(ids => localStorage.setItem("cra-detailed-assessment-v1", JSON.stringify({ version: 1, catalogRevision: 3, answers: Object.fromEntries(ids.map(id => [id, "Yes"])), notes: {} })), catalog.items.map(item => item.id));
+    await page.reload();
+    await page.getByRole("tab", { name: /Detailed verification/ }).click();
+    await detail.getByRole("button", { name: "Copy agent prompt", exact: true }).click();
+    assert.ok((await detail.locator(".dv-agent-status").first().innerText()).includes("All controls are answered"));
+    await detail.getByLabel("Prompt scope", { exact: true }).selectOption("all");
+    assert.ok((await detail.getByLabel("Agent review prompt", { exact: true }).inputValue()).includes('"id": "product-boundaries"'));
     const blocked = await browser.newContext();
     await blocked.addInitScript(() => { Storage.prototype.getItem = Storage.prototype.setItem = () => { throw new DOMException("Blocked", "SecurityError"); }; });
     const blockedPage = await blocked.newPage();
