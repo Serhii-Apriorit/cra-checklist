@@ -61,7 +61,7 @@ if the entire item is outside the product context. Leave unreviewed items
 unanswered. Related controls distinguish mechanisms, trust boundaries and
 lifecycle stages; shared evidence can support more than one item.
 
-The detailed catalog contains 96 controls after consolidating repeated risk
+The detailed catalog contains 94 controls after consolidating repeated risk
 reviews, requirements matrices, authorization checks, platform/debug reviews,
 identity/storage protection and alert-response checks. Each combined control
 retains the applicable scenarios from its former items. Catalog revision 2
@@ -78,7 +78,13 @@ release-linked handoff evidence. These are engineering verification details;
 project policy remains distinct from legal requirements and reporting clocks.
 Earlier Yes answers for these expanded controls become unanswered for review,
 with the previous response and all evidence retained in notes. Other answers
-and control IDs are preserved; the checklist still contains 96 controls.
+and control IDs are preserved; the revision 3 checklist contains 96 controls.
+
+Catalog revision 4 rewords several questions in plainer language, merges
+component isolation into runtime least privilege and session fixation into
+token resistance, and requires MFA for privileged access. Merged answers follow
+the revision 2 rules, and an earlier Yes for privileged access becomes
+unanswered for review with notes retained. The checklist contains 94 controls.
 
 Detailed verification includes **Review with your project agent**. Copy a prompt
 for unanswered controls (or all controls) to an agent with project access, then
@@ -116,7 +122,7 @@ N/A, and is not a compliance score. Unresolved priority counts include No and
 unanswered items, excluding N/A.
 
 **Grouped verification**, the third tab, is an independent experiment with 18
-broader, evidence-led questions. It maps each of the 96 detailed controls to
+broader, evidence-led questions. It maps each of the 94 detailed controls to
 exactly one evidence bundle without changing the first two assessments. Each
 question suggests evidence to review once; expand **Coverage and individual
 exceptions** for the full original wording, priority, applicability and sources.
@@ -139,7 +145,7 @@ JSON validation and preview-before-apply workflow. Inherited answers are kept
 unless replacement is selected. Unknown agent findings never erase answers.
 Code inspection alone cannot establish deployed behavior or operational evidence.
 
-Experimental PDF/Markdown exports retain all 18 group outcomes, 96 original
+Experimental PDF/Markdown exports retain all 18 group outcomes, 94 original
 controls, shared/individual notes and each answer's origin, even when filtered.
 Separate file references remain opt-in. Reset affects only the experiment. If
 the catalog or grouping revision changes, group decisions and individual passes

@@ -13,10 +13,11 @@ vm.runInNewContext(fs.readFileSync(path.join(repo, "cra-readiness-assets/detaile
 const catalog = context.window.CRADetailedCatalog;
 assert.ok(catalog.items.length >= 80 && catalog.items.length <= 120);
 assert.equal(catalog.categories.length, 12);
-assert.equal(catalog.items.length, 96);
-assert.equal(catalog.revision, 3);
+assert.equal(catalog.items.length, 94);
+assert.equal(catalog.revision, 4);
 assert.equal(catalog.items.filter(item => item.reviewRevision === 3).length, 6);
-assert.equal(catalog.items.reduce((count, item) => count + item.mergedFrom.length, 0), 12);
+assert.equal(catalog.items.filter(item => item.reviewRevision === 4).length, 1);
+assert.equal(catalog.items.reduce((count, item) => count + item.mergedFrom.length, 0), 14);
 for (const item of catalog.items) {
   for (const former of item.mergedFrom) assert.ok(!catalog.items.some(control => control.id === former.id), `Retired control still displayed: ${former.id}`);
 }
@@ -254,7 +255,7 @@ const server = http.createServer((req, res) => {
         "risk-assessment-current": "Yes", "trust-boundaries-threats": "No", "security-design-decisions": "Yes",
         "security-requirements-acceptance": "Yes", "annex-requirement-mapping": "Yes", "contract-security-deliverables": "Yes",
         "role-function-controls": "Yes", "server-side-authorization": "Yes",
-        "least-privilege-runtime": "Yes", "service-identities-scoped": "Yes",
+        "least-privilege-runtime": "Yes", "service-identities-scoped": "Yes", "component-isolation": "Yes",
         "data-at-rest-protection": "Yes", "device-local-secret-protection": "No",
         "default-services-minimized": "Not applicable", "platform-hardening": "Not applicable",
         "regular-security-testing": "Yes", "secure-sdlc-operational": "No", "vulnerability-remediation-timely": "No",
@@ -276,7 +277,7 @@ const server = http.createServer((req, res) => {
     const migratedNotes = await card("risk-assessment-current").locator("textarea").inputValue();
     assert.ok(migratedNotes.includes("RISK-END") && migratedNotes.includes("THREAT-END") && migratedNotes.includes("DESIGN-END"));
     assert.ok(migratedNotes.length > 30000, "All three long source notes must survive consolidation");
-    assert.equal(await detail.locator(".dv-control").count(), 96);
+    assert.equal(await detail.locator(".dv-control").count(), catalog.items.length);
     assert.equal(await detail.locator(".dv-migration-notice").isVisible(), true);
     assert.equal(await card("risk-assessment-current").locator("textarea").isVisible(), false);
     await page.reload();
@@ -304,7 +305,7 @@ const server = http.createServer((req, res) => {
     assert.ok((await card("sbom-release-specific").locator("textarea").inputValue()).endsWith("SBOM-END"));
     const expandedNotes = await card("regular-security-testing").locator("textarea").inputValue();
     assert.ok(expandedNotes.endsWith("SCANS-END"));
-    assert.equal(await detail.locator(".dv-control").count(), 96);
+    assert.equal(await detail.locator(".dv-control").count(), catalog.items.length);
     assert.equal(await card("default-services-minimized").getByRole("radio", { name: "Not applicable", exact: true }).isChecked(), true);
     assert.equal(await card("data-at-rest-protection").getByRole("radio", { name: "No", exact: true }).isChecked(), true);
     await card("sbom-release-specific").getByRole("radio", { name: "Yes", exact: true }).check();
@@ -312,7 +313,21 @@ const server = http.createServer((req, res) => {
     await page.getByRole("tab", { name: /Detailed verification/ }).click();
     assert.equal(await card("sbom-release-specific").getByRole("radio", { name: "Yes", exact: true }).isChecked(), true);
     assert.equal(await card("regular-security-testing").locator("textarea").inputValue(), expandedNotes, "Revision 3 review migration must be idempotent");
-    await page.evaluate(ids => localStorage.setItem("cra-detailed-assessment-v1", JSON.stringify({ version: 1, catalogRevision: 3, answers: Object.fromEntries(ids.map(id => [id, "Yes"])), notes: {} })), catalog.items.map(item => item.id));
+    // Revision 4 merges: any retired No fails the combined control; a lone pass stays unverified.
+    await page.evaluate(() => localStorage.setItem("cra-detailed-assessment-v1", JSON.stringify({
+      version: 1, catalogRevision: 3,
+      answers: { "least-privilege-runtime": "Yes", "component-isolation": "No", "tokens-unpredictable": "Yes", "session-rotation-binding": "Yes", "privileged-mfa": "Yes", "browser-session-storage": "Yes" },
+      notes: { "component-isolation": "ISOLATION-END" }
+    })));
+    await page.reload();
+    await page.getByRole("tab", { name: /Detailed verification/ }).click();
+    assert.equal(await card("least-privilege-runtime").getByRole("radio", { name: "No", exact: true }).isChecked(), true);
+    assert.ok((await card("least-privilege-runtime").locator("textarea").inputValue()).includes("ISOLATION-END"));
+    assert.equal(await card("tokens-unpredictable").getByRole("radio", { name: "Yes", exact: true }).isChecked(), true);
+    assert.equal(await card("privileged-mfa").locator("input:checked").count(), 0);
+    assert.equal(await card("browser-session-storage").getByRole("radio", { name: "Yes", exact: true }).isChecked(), true);
+    assert.equal(await detail.locator('[id="control-component-isolation"]').count(), 0);
+    await page.evaluate(ids => localStorage.setItem("cra-detailed-assessment-v1", JSON.stringify({ version: 1, catalogRevision: 4, answers: Object.fromEntries(ids.map(id => [id, "Yes"])), notes: {} })), catalog.items.map(item => item.id));
     await page.reload();
     await page.getByRole("tab", { name: /Detailed verification/ }).click();
     await detail.getByRole("button", { name: "Copy agent prompt", exact: true }).click();

@@ -20,13 +20,13 @@
   let filters = { search: "", category: "all", priority: "all", answer: "all" };
 
   function consolidateSavedAssessment(saved) {
-    // Consolidation happened in revision 2; later wording updates must not merge history again.
-    if (saved.catalogRevision >= 2) return saved;
+    // Each merge applies once: only to assessments saved before the merge's catalog revision.
+    const pending = item => (item.mergedFrom || []).filter(member => (member.revision || 2) > (saved.catalogRevision || 0));
     const answers = { ...saved.answers };
     const notes = { ...saved.notes };
     let changed = false;
-    for (const item of catalog.items.filter(item => item.mergedFrom?.length)) {
-      const members = [{ id: item.id, label: item.title }, ...item.mergedFrom];
+    for (const item of catalog.items.filter(item => pending(item).length)) {
+      const members = [{ id: item.id, label: item.title }, ...pending(item)];
       if (!members.some(member => choices.includes(answers[member.id]) || typeof notes[member.id] === "string" && notes[member.id])) continue;
       changed = true;
       const previous = members.map(member => ({ ...member, answer: choices.includes(answers[member.id]) ? answers[member.id] : "Unanswered", note: typeof notes[member.id] === "string" ? notes[member.id].slice(0, 10000) : "" }));
@@ -40,7 +40,7 @@
       notes[item.id] = "Previous responses preserved after checklist consolidation. Review the combined control before changing its answer.\n\n" + previous.map(member => `${member.label}\nPrevious answer: ${member.answer}${member.note ? `\n${member.note}` : ""}`).join("\n\n");
     }
     if (changed) migrationNotice = "The checklist has been consolidated. Previous responses and notes are preserved under the combined controls. Review any merged controls now shown as unanswered.";
-    return { ...saved, answers, notes, catalogRevision: 2 };
+    return { ...saved, answers, notes };
   }
 
   function reviewExpandedControls(saved) {
