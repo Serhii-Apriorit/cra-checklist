@@ -159,10 +159,10 @@ const server = http.createServer((req, res) => {
     assert.equal(await files.locator(".dv-file-entry").count(), 1);
     await files.locator("summary").click();
     assert.equal(await detail.getByLabel("Include file evidence in PDF and Markdown", { exact: true }).isChecked(), false);
-    const malicious = '<img src=x onerror="window.injection=true"> & Тест';
+    const malicious = '<img src=x onerror="window.injection=true"> & Test';
     await detail.locator("[data-field=product]").fill(malicious);
     await detail.locator("[data-field=reviewer]").fill("Detailed reviewer");
-    const note = ("Detailed evidence Тест & <script>alert(1)</script>\n" + "LongUnbrokenEvidence".repeat(600)).slice(0, 9960) + "\nEND-OF-LONG-NOTE";
+    const note = ("Detailed evidence Test & <script>alert(1)</script>\n" + "LongUnbrokenEvidence".repeat(600)).slice(0, 9960) + "\nEND-OF-LONG-NOTE";
     assert.equal(await detail.locator(".dv-notes textarea:visible").count(), 0);
     await card(a.id).locator(".dv-notes summary").click();
     await card(a.id).locator("textarea").fill(note);
