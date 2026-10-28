@@ -14,9 +14,9 @@ const catalog = context.window.CRADetailedCatalog;
 assert.ok(catalog.items.length >= 80 && catalog.items.length <= 120);
 assert.equal(catalog.categories.length, 12);
 assert.equal(catalog.items.length, 94);
-assert.equal(catalog.revision, 4);
+assert.equal(catalog.revision, 5);
 assert.equal(catalog.items.filter(item => item.reviewRevision === 3).length, 6);
-assert.equal(catalog.items.filter(item => item.reviewRevision === 4).length, 1);
+assert.equal(catalog.items.filter(item => item.reviewRevision === 5).length, 1);
 assert.equal(catalog.items.reduce((count, item) => count + item.mergedFrom.length, 0), 14);
 for (const item of catalog.items) {
   for (const former of item.mergedFrom) assert.ok(!catalog.items.some(control => control.id === former.id), `Retired control still displayed: ${former.id}`);
@@ -75,6 +75,15 @@ const server = http.createServer((req, res) => {
     assert.equal(await detail.locator("[data-count=unanswered]").innerText(), String(catalog.items.length));
     const [a, b, c] = catalog.items;
     const card = id => detail.locator(`[id="control-${id}"]`);
+    // Multi-step guidance stays collapsed; expanding it exposes every check once.
+    const recoveryGuidance = card("update-installation-recovery").locator(".dv-guidance");
+    assert.equal(await recoveryGuidance.getAttribute("open"), null);
+    assert.equal(await recoveryGuidance.locator("ul").isVisible(), false);
+    await recoveryGuidance.locator("summary").click();
+    const recoveryChecks = catalog.items.find(item => item.id === "update-installation-recovery").verificationChecks;
+    assert.deepEqual(await recoveryGuidance.locator("li").allTextContents(), Array.from(recoveryChecks));
+    assert.equal(await card("update-installation-recovery").locator("h4").innerText(), "Can an interrupted or failed security update return the product to a supported working state?");
+    await recoveryGuidance.locator("summary").click();
     await card(a.id).getByRole("radio", { name: "Yes", exact: true }).check();
     await card(b.id).getByRole("radio", { name: "No", exact: true }).check();
     await card(c.id).getByRole("radio", { name: "Not applicable", exact: true }).check();
@@ -327,7 +336,23 @@ const server = http.createServer((req, res) => {
     assert.equal(await card("privileged-mfa").locator("input:checked").count(), 0);
     assert.equal(await card("browser-session-storage").getByRole("radio", { name: "Yes", exact: true }).isChecked(), true);
     assert.equal(await detail.locator('[id="control-component-isolation"]').count(), 0);
-    await page.evaluate(ids => localStorage.setItem("cra-detailed-assessment-v1", JSON.stringify({ version: 1, catalogRevision: 4, answers: Object.fromEntries(ids.map(id => [id, "Yes"])), notes: {} })), catalog.items.map(item => item.id));
+    // Revision 5 requires a fresh review of privileged-access alternatives only.
+    await page.evaluate(() => localStorage.setItem("cra-detailed-assessment-v1", JSON.stringify({
+      version: 1, catalogRevision: 4,
+      answers: { "privileged-mfa": "Yes", "object-level-access": "Yes" },
+      notes: { "privileged-mfa": "Existing MFA evidence" }
+    })));
+    await page.reload();
+    await page.getByRole("tab", { name: /Detailed verification/ }).click();
+    assert.equal(await card("privileged-mfa").locator("input:checked").count(), 0);
+    assert.equal(await card("object-level-access").getByRole("radio", { name: "Yes", exact: true }).isChecked(), true);
+    const mfaNotes = await card("privileged-mfa").locator("textarea").inputValue();
+    assert.ok(mfaNotes.includes("Previous answer: Yes before catalog revision 5"));
+    assert.ok(mfaNotes.endsWith("Existing MFA evidence"));
+    await page.reload();
+    await page.getByRole("tab", { name: /Detailed verification/ }).click();
+    assert.equal(await card("privileged-mfa").locator("textarea").inputValue(), mfaNotes);
+    await page.evaluate(({ ids, revision }) => localStorage.setItem("cra-detailed-assessment-v1", JSON.stringify({ version: 1, catalogRevision: revision, answers: Object.fromEntries(ids.map(id => [id, "Yes"])), notes: {} })), { ids: catalog.items.map(item => item.id), revision: catalog.revision });
     await page.reload();
     await page.getByRole("tab", { name: /Detailed verification/ }).click();
     await detail.getByRole("button", { name: "Copy agent prompt", exact: true }).click();
@@ -344,8 +369,8 @@ const server = http.createServer((req, res) => {
     assert.equal(await blockedPage.locator("[data-count=reviewed]").innerText(), "1");
     await blockedPage.getByRole("tab", { name: /General verification/ }).click();
     const blockedGeneral = blockedPage.locator("#general-verification-panel");
-    await blockedGeneral.locator("#requirement-1").getByRole("radio", { name: "Have it", exact: true }).check();
-    await blockedGeneral.locator("#requirement-5").getByRole("radio", { name: "Partially", exact: true }).check();
+    await blockedGeneral.locator("#requirement-1 .answer").filter({ hasText: "Have it" }).click();
+    await blockedGeneral.locator("#requirement-5 .answer").filter({ hasText: "Partially" }).click();
     await blockedGeneral.locator("#requirement-5 .notes summary").click();
     await blockedGeneral.locator("#requirement-5 textarea").fill("Unavailable storage filtered evidence");
     await blockedGeneral.getByRole("combobox", { name: "Filter requirements" }).selectOption("Have it");

@@ -86,6 +86,13 @@ token resistance, and requires MFA for privileged access. Merged answers follow
 the revision 2 rules, and an earlier Yes for privileged access becomes
 unanswered for review with notes retained. The checklist contains 94 controls.
 
+Catalog revision 5 clarifies approval and testing of alternatives where privileged
+MFA is technically impossible, removes repeated key-lifecycle verification from
+least privilege, and clarifies resource-access and logging opt-out wording.
+Longer verification instructions use bullet lists inside the existing collapsed
+“How to verify / evidence” section. An earlier Yes for privileged access becomes
+unanswered for review; the previous answer and notes are preserved.
+
 Detailed verification includes **Review with your project agent**. Copy a prompt
 for unanswered controls (or all controls) to an agent with project access, then
 paste its JSON response, preview it and apply the results. The prompt includes

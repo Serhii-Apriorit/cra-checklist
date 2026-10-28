@@ -51,7 +51,10 @@
 
   const items = [];
   const add = (category, id, title, priority, guidance, evidence, applicability, basis, refs) => {
-    items.push({ id, category, title, priority, guidance, evidence, applicability, basis,
+    // Keep a plain-text version for agent prompts, search and exported reports.
+    const verificationChecks = Array.isArray(guidance) ? guidance : null;
+    items.push({ id, category, title, priority, guidance: verificationChecks ? verificationChecks.join(" ") : guidance,
+      ...(verificationChecks ? { verificationChecks } : {}), evidence, applicability, basis,
       references: refs.map(key => ({ ...references[key] })) });
   };
   const CRA = "CRA requirement";
@@ -68,11 +71,20 @@
     "Scope decision; category rationale; conformity-assessment owner.",
     "For products being evaluated for the EU market; this self-check does not determine statutory status or conformity.", CRA, ["scope", "important", "critical", "conformity"]);
   add(group, "risk-assessment-current", "Is the product security risk assessment current, documented and reviewed?", "High",
-    "Use one reviewed assessment to describe entry points, data flows, trust boundaries and credible abuse scenarios, including physical threats where relevant. Exercise relevant abuse cases or link their verification results. Record chosen protections, design rationale, compensating controls and residual-risk owners. Cover development through support and update the review when the product or threat landscape changes.",
+    [
+      "Use one reviewed assessment to describe entry points, data flows, trust boundaries and credible abuse scenarios, including physical threats where relevant.",
+      "Exercise relevant abuse cases or link their verification results.",
+      "Record chosen protections, design rationale, compensating controls and residual-risk owners.",
+      "Cover development through support and update the review when the product or threat landscape changes."
+    ],
     "Versioned risk assessment with threat model, design decisions, residual-risk register and review history.",
     "Applies throughout the product lifecycle. Scale analysis to product risk; residual-risk acceptance cannot waive an applicable statutory obligation.", CRA, ["risk", "I1", "asvs", "ssdf"]);
   add(group, "security-requirements-acceptance", "Is every security requirement linked to a test or other evidence and a responsible owner?", "High",
-    "Maintain one requirements matrix linking every applicable Annex I Part I and Part II outcome and additional agreed security requirements to implementation, acceptance tests, evidence and responsible owners. Record the reviewer and reasons for inapplicable requirements, and track pre-release decisions for unresolved requirements. For contracted work, include evidence formats, delivery dates and continued access to the source, SBOM and findings needed after handoff.",
+    [
+      "Maintain one requirements matrix linking every applicable Annex I Part I and Part II outcome and additional agreed security requirements to implementation, acceptance tests, evidence and responsible owners.",
+      "Record the reviewer and reasons for inapplicable requirements, and track pre-release decisions for unresolved requirements.",
+      "For contracted work, include evidence formats, delivery dates and continued access to the source, SBOM and findings needed after handoff."
+    ],
     "Requirements and applicability matrix with acceptance criteria, test/evidence links, reviewed exceptions and contractual delivery commitments where applicable.",
     "Applies to product security requirements and changes. Contractual delivery columns apply only where work is contracted; the Annex I mapping applies to CRA readiness. A completed matrix alone does not establish conformity.", ENG, ["I1", "manufacturer", "ssdf"]);
   add(group, "data-purpose-inventory", "Is each collected or processed data field justified by product purpose?", "High",
@@ -82,7 +94,12 @@
 
   group = "production-defaults";
   add(group, "production-debug-disabled", "Are production debug and diagnostic interfaces disabled or protected against unauthorized access?", "Critical",
-    "Inspect actual production packages, runtime configuration and, where present, hardware units for debug servers, interactive consoles, diagnostic switches, JTAG, UART and service/recovery ports. Disable unsafe capabilities or verify authenticated unlocking, limited privileges and operational justification for supported diagnostics. Test remote and local re-enablement attempts relevant to the product. Debug symbols alone are not an unsafe debug interface.",
+    [
+      "Inspect actual production packages, runtime configuration and, where present, hardware units for debug servers, interactive consoles, diagnostic switches, JTAG, UART and service/recovery ports.",
+      "Disable unsafe capabilities or verify authenticated unlocking, limited privileges and operational justification for supported diagnostics.",
+      "Test remote and local re-enablement attempts relevant to the product.",
+      "Debug symbols alone are not an unsafe debug interface."
+    ],
     "Production build/configuration review; diagnostic endpoint and port tests; hardware inspection and authenticated-unlock tests where relevant.",
     "Applies to production releases. Test each network, local or hardware diagnostic surface that exists. Supported maintenance capabilities must have approved authorization; products without hardware ports assess only their applicable software surfaces.", ENG, ["I2b", "I2j", "I2d", "asvs"]);
   add(group, "production-demo-accounts-removed", "Are development/test identities and unintended demo accounts excluded from production?", "Critical",
@@ -119,7 +136,7 @@
     "Inspect provisioning for shared default or hardcoded passwords. Verify unique credentials or secure first-use enrollment and that deployed secrets can be changed or revoked.",
     "Provisioning design; image secret scan; initial-credential tests.",
     "Applies to password, key and device-identity provisioning; account-free products may mark this not applicable with evidence.", ENG, ["I2b", "I2d", "asvs"]);
-  add(group, "authentication-all-entrypoints", "Does every non-public interface (APIs, admin tools, device protocols) require authentication, not only the main UI?", "High",
+  add(group, "authentication-all-entrypoints", "Does every non-public interface (APIs, admin tools, device protocols) require authentication?", "High",
     "Test APIs, administrative tools, device protocols and alternate routes without credentials and with invalid credentials. Confirm the same protection applies beyond the main user interface.",
     "Endpoint inventory; unauthenticated request results; protocol tests.",
     "Applies to functions requiring identity; document deliberately public functionality.", ENG, ["I2d", "asvs"]);
@@ -127,10 +144,19 @@
     "Review the configured password-hashing algorithm and work factor. Inspect a test account record and verify migration away from weak or reversible storage.",
     "Hashing configuration; sanitized database sample; migration plan.",
     "Applies when the product stores passwords; federated-only or passwordless systems can record not applicable.", ENG, ["asvs", "I2e"]);
-  add(group, "privileged-mfa", "Is multi-factor authentication (MFA) required for administrator, support and other privileged access?", "High",
-    "List administrative, support and release identities and the interfaces they use. Verify that MFA is enforced for every privileged login, including remote, API and console access, and cannot be skipped through alternate login paths, legacy protocols or account recovery. Check that MFA enrollment and reset require existing strong verification. Where MFA is technically impossible (for example, a local device console), document the compensating control.",
-    "Privileged-account inventory; MFA enforcement configuration; login and bypass test results; MFA recovery procedure.",
-    "Applies wherever privileged access exists, including through an identity provider. The CRA does not name MFA; it is the expected engineering measure for privileged access under Annex I Part I 2(d). Record any compensating control and its rationale.", ENG, ["asvs", "I2d"]);
+  add(group, "privileged-mfa", "Is privileged access protected by multi-factor authentication (MFA), or by an approved and tested alternative where MFA is technically impossible?", "High",
+    [
+      "List administrator, support and release identities and every interface they use.",
+      "Verify MFA enforcement for privileged human logins, including alternate login and recovery paths.",
+      "Check that MFA enrollment and reset require strong identity verification.",
+      "Where MFA is technically impossible, record the technical constraint, the alternative protection and its test results.",
+      "The owner responsible for product security risk must approve the alternative and its rationale.",
+      "Answer Yes only when every applicable access path enforces MFA or has an approved alternative whose tests demonstrate protection against the identified unauthorized-access threats.",
+      "A written exception without implemented and verified protection is No.",
+      "Leave the question unanswered while verification or approval is pending."
+    ],
+    "Privileged-account inventory; MFA enforcement configuration; login and bypass test results; MFA recovery procedure; technical constraints, alternative-protection tests and risk-owner approval where applicable.",
+    "Applies wherever privileged access exists, including through an identity provider. The CRA does not name MFA; it is the expected engineering measure for privileged access under Annex I Part I 2(d). Where MFA is technically impossible, an alternative must meet the approval and verification criteria above.", ENG, ["asvs", "I2d"]);
   add(group, "credential-attack-controls", "Are credential guessing and automated login abuse mitigated?", "High",
     "Test rate limits, backoff, monitoring and account-enumeration responses. Check that protective mechanisms do not create an easy account-lockout denial of service.",
     "Login abuse tests; throttling configuration; alert examples.",
@@ -139,17 +165,23 @@
     "Exercise reset and recovery links with expired, reused and altered tokens. Check that changing recovery channels requires appropriate verification and that completion reaches the session-revocation path.",
     "Recovery flow tests; token validation tests; recovery notification sample.",
     "Applies when account recovery is offered; document external identity-provider responsibilities.", ENG, ["asvs", "I2d"]);
-  add(group, "federation-validation", "If users sign in through an external identity provider (SSO), are its responses fully validated?", "High",
+  add(group, "federation-validation", "Is sign-in through an external identity provider (SSO) securely configured and validated?", "High",
     "Applies to sign-in through providers such as Microsoft Entra ID, Google or Okta using OAuth/OpenID Connect or SAML. Test issuer, audience, signature, redirect URI, state and nonce or equivalent protocol bindings. Attempt cross-client and cross-tenant response substitution.",
     "Identity-provider configuration; federation negative tests; trust metadata.",
     "Applies to OAuth/OIDC, SAML or comparable federation; mark not applicable for products without federation.", ENG, ["asvs"]);
 
   group = "authorization";
-  add(group, "object-level-access", "Can users access only the records they are permitted to, even if they change an ID in the request?", "High",
-    "Swap identifiers across users for reads, writes, downloads and deletion, including nested and batch endpoints. Confirm denied access does not disclose object contents.",
+  add(group, "object-level-access", "Does the product check permission for each requested resource before allowing access?", "High",
+    [
+      "Using accounts with different permissions, change resource identifiers in requests to read, create, modify, download or delete data.",
+      "Include nested and batch requests.",
+      "Verify that users cannot access resources outside their permissions and that denied requests do not reveal protected contents.",
+      "Examples include another user’s document, order, file or project.",
+      "Assess field permissions and tenant isolation under their separate questions."
+    ],
     "Cross-user object-access tests; authorization matrix.",
     "Applies to products with user-owned or access-controlled resources.", ENG, ["asvs", "I2d"]);
-  add(group, "role-function-controls", "Does the server check the caller’s permissions for every protected action, rather than relying on hidden UI elements?", "Critical",
+  add(group, "role-function-controls", "Does the server check the caller’s permissions for every protected action?", "Critical",
     "Invoke protected and administrative functions directly through APIs, scheduled jobs, tools and every configuration channel, bypassing UI restrictions. Verify trusted server or device enforcement, default denial and rejection of unauthorized operations. Include authorization, invalid-setting rejection and traceable changes for security-sensitive configuration. Object, field and tenant permissions remain separate checks.",
     "Role-to-operation matrix; direct-invocation and privilege-escalation tests; security-configuration validation and change records.",
     "Applies wherever operations require authorization, including security-setting changes. Browser-side hiding alone does not satisfy the control; object-only or tenant-only permissions do not replace function checks.", ENG, ["asvs", "I2d", "I2f"]);
@@ -158,8 +190,16 @@
     "Cross-tenant test suite; tenancy design; queue and cache key review.",
     "Applies to multi-tenant products; single-tenant products should record their deployment boundary.", ENG, ["asvs", "I2d", "I2k"]);
   add(group, "least-privilege-runtime", "Are runtime components and service identities limited to the privileges and resources they need?", "High",
-    "Inventory process users, workload identities, external service callers, API keys and device identities. Check operating-system capabilities, app/cloud permissions and narrow credential scopes. Test denied operations and credential rotation or revocation. Review isolation around high-risk components such as parsers, plugins, installed-app sandboxes and external integrations, and confirm that compromise of a lower-trust component has constrained access to other components and data. Apply cryptographic-key lifecycle controls to relevant keys as well.",
-    "Runtime/service identity inventory; permission and isolation policies; denied-operation, containment and rotation/revocation results.",
+    [
+      "Inventory process users, workload identities, external service callers, API keys and device identities.",
+      "Check operating-system capabilities, app/cloud permissions and narrow credential scopes.",
+      "Verify that each identity is denied operations outside its assigned permissions.",
+      "Revoke a test identity or credential and confirm that it can no longer access protected resources.",
+      "Review isolation around high-risk components such as parsers, plugins, installed-app sandboxes and external integrations, and confirm that compromise of a lower-trust component has constrained access to other components and data.",
+      "Verify cryptographic-key generation, rotation, recovery and destruction under the separate key-lifecycle question.",
+      "Reference the same evidence where it supports both questions."
+    ],
+    "Runtime and service identity inventory; permission and isolation policies; denied-operation, containment and identity or credential revocation results.",
     "Applies to process, cloud, device and machine-to-machine identities and to components handling untrusted input. Select process, container, hardware or logical isolation according to the threat model; human login strength is covered separately.", ENG, ["ssdf", "asvs", "I2d", "I2k"]);
   add(group, "support-access-controlled", "Is maintenance and support access explicitly authorized and traceable?", "High",
     "Test the support-access path, time bounds and approval controls. Verify identity attribution, privilege limits and removal when the support task ends.",
@@ -213,15 +253,15 @@
     "Capture representative traffic and verify that required data exchanges use encrypted transports with approved protocol settings. Include internal links that cross an untrusted or shared boundary. Peer-identity and certificate rejection tests belong to the separate peer-validation control.",
     "Traffic capture; TLS configuration; service-to-service trust diagram.",
     "Apply confidentiality controls to relevant data and risks; do not assume every internal link has the same exposure.", CRA, ["I2e"]);
-  add(group, "data-at-rest-protection", "Is sensitive stored data, including keys and credentials, encrypted or otherwise protected from unauthorized reading?", "High",
-    "Inspect databases, files, backups, caches and device storage, including provisioned identities and private keys. Demonstrate risk-appropriate encryption or other technical protection, restricted decryption access and secure storage permissions. For production hardware, exercise the physical extraction scenarios in the threat model and assess hardware-backed key storage where justified. Verify that an extracted device identity does not unlock other devices or expose fleet-wide data.",
+  add(group, "data-at-rest-protection", "Is sensitive stored data, including local credentials, encrypted at rest and protected against unauthorized disclosure?", "High",
+    "Inspect databases, files, backups, caches and device storage, including provisioned identities and private keys. Demonstrate risk-appropriate encryption, restricted decryption access and secure storage permissions. For production hardware, exercise the physical extraction scenarios in the threat model and assess hardware-backed key storage where justified. Verify that an extracted device identity does not unlock other devices or expose fleet-wide data.",
     "Storage and credential-location inventory; encryption/access settings; unauthorized-read tests; hardware extraction and key-store review where applicable.",
     "Applies to sensitive stored data and secrets, with physical tests conditional on deployment exposure. Not every product needs the same storage mechanism; use the documented threat model and provider responsibility boundaries.", CRA, ["I2e", "I2k", "asvs"]);
   add(group, "peer-certificate-validation", "Do secure connections reject untrusted or mismatched peers?", "High",
     "Test expired, untrusted and wrong-host certificates and inspect production trust stores. Check that permissive development certificate validation is disabled.",
     "Negative TLS tests; trust-store review; production client configuration.",
     "Applies to certificate-based secure transports; assess equivalent trust validation for other protocols.", ENG, ["asvs", "I2e"]);
-  add(group, "crypto-algorithms-reviewed", "Does the product use only standard, current cryptographic algorithms, libraries and key sizes?", "High",
+  add(group, "crypto-algorithms-reviewed", "Are all cryptographic mechanisms reviewed for an appropriate level of security?", "High",
     "Inventory cryptographic uses, libraries, algorithms, modes and key lengths. Review them against current recognized guidance and avoid custom cryptographic constructions.",
     "Cryptographic inventory; configuration review; migration decisions.",
     "Applies where cryptography is used; consider expected data lifetime and product support period.", ENG, ["asvs", "I2e", "I2f"]);
@@ -353,8 +393,14 @@
     "Inject control characters and misleading delimiters into logged values. Check safe structured encoding, actor/action attribution, reliable timestamps and request correlation without putting secrets in identifiers. Define an investigation retention period and verify records remain usable for that period, then expire under the retention policy.",
     "Log injection tests; timestamp configuration; correlated event examples; retention and expiry tests.",
     "Applies where logs support investigation; account for devices with limited or intermittently synchronized clocks.", ENG, ["asvs"]);
-  add(group, "security-log-optout", "Does the user have an effective opt-out mechanism for relevant activity logging?", "High",
-    "Exercise the documented opt-out and confirm its scope and resulting behavior. Clearly explain effects on monitoring and any separately required records for legal review.",
+  add(group, "security-log-optout", "Can users opt out of the security-related activity logging identified in the product’s applicability assessment?", "High",
+    [
+      "Identify the security-related activity logging covered by this control in the product’s applicability assessment.",
+      "List the affected event types, such as access to protected data or changes to security settings.",
+      "Exercise the user-facing opt-out, repeat those activities and verify that the affected logging stops.",
+      "Explain which records remain, why they remain and how opting out affects monitoring.",
+      "Refer any claimed legal restriction on opting out for legal review; do not assume an administrator-only setting satisfies the user mechanism."
+    ],
     "Opt-out walkthrough; before-and-after event results; user instructions.",
     "Evaluate the Part I 2(l) mechanism in product context; do not silently replace opt-out with an administrator-only setting or ignore other applicable law.", CRA, ["I2l"]);
 
@@ -372,11 +418,24 @@
     "Release vulnerability review; fixes and retests; exploitability rationale.",
     "Applies to market releases on the risk-assessed basis of Part I point 2; a clean SCA scan alone is not proof.", CRA, ["I2a", "II1"]);
   add(group, "regular-security-testing", "Are security tests and reviews embedded in normal delivery and repeated at defined triggers?", "High",
-    "Sample normal product changes to verify that the risk-based review and test plan runs at its defined cadence and change triggers. Verify that required software composition analysis (SCA), static application security testing (SAST) and other automatable checks actually run in CI against the relevant source, dependencies and artifacts. Exercise failed, skipped and disabled mandatory scans and confirm they cannot appear successful. Retain coverage and results, assign process-gap owners and use incident root causes to improve regression tests. Merge enforcement is assessed under repository protection; individual remediation is assessed under vulnerability handling.",
+    [
+      "Sample normal product changes to verify that the risk-based review and test plan runs at its defined cadence and change triggers.",
+      "Verify that required software composition analysis (SCA), static application security testing (SAST) and other automatable checks actually run in CI against the relevant source, dependencies and artifacts.",
+      "Exercise failed, skipped and disabled mandatory scans and confirm they cannot appear successful.",
+      "Retain coverage and results, assign process-gap owners and use incident root causes to improve regression tests.",
+      "Merge enforcement is assessed under repository protection; individual remediation is assessed under vulnerability handling."
+    ],
     "Approved security test plan; CI scan definitions and execution logs; source/artifact identifiers; scanner configuration; failed/skipped-scan tests; review reports and process-gap owners.",
     "Applies across development and maintenance. Select testing methods according to product risk and the agreed project plan; explain inapplicable tools and alternative verification. The CRA does not universally prescribe named scanners, SAST, SCA or a particular penetration-test format or cadence.", CRA, ["II3", "ssdf"]);
   add(group, "repository-access-protection", "Are source changes protected by access controls, review and mandatory security gates?", "High",
-    "Review access, strong authentication, branch rules, workflow protection and independent review for critical changes. Test removal of departed identities. Verify that mandatory security checks prevent merge or promotion when the project's configured thresholds are not met, including missing or failed checks. Review administrator and service-account bypass paths. Require any permitted exception to identify its scope, justification, approving owner and expiry date. An internal exception cannot authorize a market release with a known exploitable vulnerability; assess that outcome under the release gate.",
+    [
+      "Review access, strong authentication, branch rules, workflow protection and independent review for critical changes.",
+      "Test removal of departed identities.",
+      "Verify that mandatory security checks prevent merge or promotion when the project's configured thresholds are not met, including missing or failed checks.",
+      "Review administrator and service-account bypass paths.",
+      "Require any permitted exception to identify its scope, justification, approving owner and expiry date.",
+      "An internal exception cannot authorize a market release with a known exploitable vulnerability; assess that outcome under the release gate."
+    ],
     "Repository/branch rules; required security-check configuration and thresholds; rejected-merge/promotion tests; access and bypass reviews; scoped exception records with owners and expiry dates.",
     "Applies to supplier-controlled source and configuration repositories and their merge/promotion controls. Thresholds are project engineering policy rather than a universal CRA severity cutoff. Direct commits and non-PR workflows need equivalent enforced checks; a missing required gate is No, not Not applicable.", ENG, ["ssdf"]);
   add(group, "ci-runner-secret-isolation", "Are CI jobs and runners isolated from unauthorized secrets and production access?", "Critical",
@@ -384,7 +443,13 @@
     "CI permission review; untrusted-build test; runner isolation configuration.",
     "Applies to build and release automation, including externally hosted runners.", ENG, ["ssdf"]);
   add(group, "artifact-provenance-release-approval", "Can each release artifact be traced to approved source and build inputs?", "High",
-    "Verify source revision, build configuration, dependency inputs and approval for the exact distributed artifact. Record cryptographic digests for released packages, binaries and images, and bind those digests to authenticated provenance or signed manifests. Verify the signature or equivalent authentication and test that artifact substitution, changed contents or altered provenance is rejected. Restrict promotion and signing to authorized identities. For installed apps, test package signing and platform trust checks during installation; assess device boot-chain and update-installation checks separately.",
+    [
+      "Verify source revision, build configuration, dependency inputs and approval for the exact distributed artifact.",
+      "Record cryptographic digests for released packages, binaries and images, and bind those digests to authenticated provenance or signed manifests.",
+      "Verify the signature or equivalent authentication and test that artifact substitution, changed contents or altered provenance is rejected.",
+      "Restrict promotion and signing to authorized identities.",
+      "For installed apps, test package signing and platform trust checks during installation; assess device boot-chain and update-installation checks separately."
+    ],
     "Artifact digests; authenticated provenance or signed release manifest; source/build identifiers; release approvals; signature-verification and tampering/substitution tests.",
     "Applies to distributed software, firmware and hosted product releases. Select suitable digest and authentication mechanisms for the release channel; an unauthenticated checksum alone is insufficient. The CRA does not mandate one particular digest algorithm or provenance tool.", ENG, ["ssdf"]);
   add(group, "pipeline-compromise-response", "Does the response plan assess product impact after a pipeline or signing compromise?", "High",
@@ -402,7 +467,12 @@
     "Update trust design; tampered-package tests; signing-key policy.",
     "Applies to updateable software and devices; evaluate packages, metadata and the trust chain together.", ENG, ["II7", "I2f", "ssdf"]);
   add(group, "update-installation-recovery", "Can an interrupted or failed security update return the product to a supported working state?", "High",
-    "Test upgrades from supported versions and interrupt installation at defined stages. Verify completion or recovery to a supported working state without data loss beyond the documented recovery policy. Reject wrong-product packages, replayed packages and unauthorized downgrades according to the update policy. Assess package authenticity before installation and authorization inside recovery mode separately.",
+    [
+      "Test upgrades from supported versions and interrupt installation at defined stages.",
+      "Verify completion or recovery to a supported working state without data loss beyond the documented recovery policy.",
+      "Reject wrong-product packages, replayed packages and unauthorized downgrades according to the update policy.",
+      "Assess package authenticity before installation and authorization inside recovery mode separately."
+    ],
     "Update matrix; interruption tests; recovery and downgrade review.",
     "Applies to updateable products; select rollback controls according to risk and recovery needs.", ENG, ["I2c", "II7", "I2h"]);
   add(group, "automatic-update-controls", "Are applicable automatic security updates enabled with usable user controls?", "High",
@@ -454,7 +524,12 @@
     "Escalation matrix; response targets; contact drill and handoff timestamps.",
     "Applies to supplier/customer response arrangements; an SLA does not extend legal notification deadlines.", CONTRACT, ["reporting", "ssdf"]);
   add(group, "security-evidence-handoff", "Does the handoff provide maintainers with usable security evidence and instructions?", "High",
-    "Deliver release-linked architecture, risk decisions, Annex I mapping, SBOM, unresolved findings, operating instructions and the secure-update mechanism specification and procedures. Include the SCA/SAST and other scan reports required by the test plan, applicable penetration-test findings and remediation/retest results. Identify the source/build or artifact, execution date, tool/version and relevant configuration for each report so reviewers can judge coverage and freshness. Verify that the receiving owner can access, interpret and use the package.",
+    [
+      "Deliver release-linked architecture, risk decisions, Annex I mapping, SBOM, unresolved findings, operating instructions and the secure-update mechanism specification and procedures.",
+      "Include the SCA/SAST and other scan reports required by the test plan, applicable penetration-test findings and remediation/retest results.",
+      "Identify the source/build or artifact, execution date, tool/version and relevant configuration for each report so reviewers can judge coverage and freshness.",
+      "Verify that the receiving owner can access, interpret and use the package."
+    ],
     "Accepted handoff pack and evidence index; release-bound scan/review and applicable penetration-test reports; remediation and retest records; secure-update design/specification; maintainer walkthrough.",
     "Applies at supplier transfer and major release milestones. Required reports follow the product risk assessment and agreed test plan; do not invent a universal penetration-test obligation. Protect confidential findings and retain evidence under applicable obligations.", CONTRACT, ["manufacturer", "ssdf"]);
 
@@ -479,8 +554,8 @@
     "artifact-provenance-release-approval", "vulnerability-remediation-timely", "security-evidence-handoff"
   ]);
   for (const item of items) if (expandedControls.has(item.id)) item.reviewRevision = 3;
-  // Revision 4 requires MFA specifically, so earlier passes need review.
-  for (const item of items) if (item.id === "privileged-mfa") item.reviewRevision = 4;
+  // Revision 5 makes approval and testing of privileged-access alternatives explicit.
+  for (const item of items) if (item.id === "privileged-mfa") item.reviewRevision = 5;
 
-  window.CRADetailedCatalog = { version: 1, revision: 4, answerGuidance, categories, items };
+  window.CRADetailedCatalog = { version: 1, revision: 5, answerGuidance, categories, items };
 })();

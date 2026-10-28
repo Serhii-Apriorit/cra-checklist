@@ -220,7 +220,18 @@
     const naHint = el("p", "dv-na-hint", "Why does this control not apply? You can record an optional justification in notes below.");
     const details = el("details", "dv-guidance");
     details.append(el("summary", "", "How to verify / evidence"));
-    for (const [heading, text] of [["How to verify", item.guidance], ["Evidence examples", item.evidence], ["Applicability", item.applicability], ["Basis", item.basis]]) {
+    if (item.verificationChecks?.length) {
+      const heading = el("p");
+      heading.append(el("strong", "", "How to verify."));
+      const checks = el("ul", "dv-verification-checks");
+      for (const check of item.verificationChecks) checks.append(el("li", "", check));
+      details.append(heading, checks);
+    }
+    const sections = [
+      ...(!item.verificationChecks?.length ? [["How to verify", item.guidance]] : []),
+      ["Evidence examples", item.evidence], ["Applicability", item.applicability], ["Basis", item.basis]
+    ];
+    for (const [heading, text] of sections) {
       const paragraph = el("p");
       paragraph.append(el("strong", "", `${heading}. `), document.createTextNode(text));
       details.append(paragraph);
