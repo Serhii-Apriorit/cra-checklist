@@ -28,11 +28,11 @@
   add("isolation", "Are service identities, support access and risky components contained?",
     "Review machine permissions, maintenance access and component boundaries together. Confirm ownership, least privilege, revocation and traceability for each identity type present.",
     "Service identity and support-access inventory + permission/isolation policies + denied-operation and credential-revocation results.",
-    "least-privilege-runtime support-access-controlled component-isolation");
+    "least-privilege-runtime support-access-controlled");
   add("sessions", "Does the full session and token lifecycle prevent persistent unauthorized access?",
     "Review issuance, storage, idle and absolute expiry, refresh, logout, security events and privilege removal as one lifecycle. Each termination path must be verified; token expiry alone does not prove revocation.",
     "One session lifecycle test suite with replay/negative cases + token and browser-storage configuration; include real server-side expiry and revocation records.",
-    "tokens-unpredictable tokens-finite-lifetime server-idle-expiry server-absolute-expiry logout-server-revocation account-security-events-revoke privilege-removal-effective refresh-rotation-replay session-rotation-binding browser-session-storage");
+    "tokens-unpredictable tokens-finite-lifetime server-idle-expiry server-absolute-expiry logout-server-revocation account-security-events-revoke privilege-removal-effective refresh-rotation-replay browser-session-storage");
   add("crypto", "Are data, commands, secrets and keys protected across trust boundaries?",
     "Trace sensitive information from transport to storage and use. Check peer validation, integrity, cryptographic parameters, secret exposure and the lifecycle of each key purpose.",
     "Data-flow and key inventory + transport/storage configuration + certificate, integrity, secret-scan and key-rotation/recovery test evidence.",

@@ -77,7 +77,7 @@
       card.hidden = !(filter === "all" || filter === "attention" && ["No", "Unanswered"].includes(status) || filter === status) || !haystack.includes(search.trim().toLowerCase());
       if (!card.hidden) visible++;
     }
-    panel.querySelector(".gv-filter-result").textContent = `Showing ${visible} of ${grouped.groups.length} questions. Exports include all 96 original controls and every group decision.`;
+    panel.querySelector(".gv-filter-result").textContent = `Showing ${visible} of ${grouped.groups.length} questions. Exports include all ${catalog.items.length} original controls and every group decision.`;
     panel.querySelector(".gv-empty").hidden = visible !== 0;
     if (focusedCard?.hidden) {
       const next = [...cardNodes.values()].find(card => !card.hidden);
@@ -203,7 +203,7 @@
       notes[item.id] = [`Experimental question: ${group.title}`, `Group outcome: ${grouped.statusFor(state, group)}; group decision: ${state.groupAnswers[group.id] || "Unanswered"}.`, `Answer source: ${explicit ? "individual review / exception" : ["Yes", "Not applicable"].includes(state.groupAnswers[group.id]) ? "group decision covering the full control" : "unanswered; a group gap does not identify individual failures"}.`, state.groupNotes[group.id] ? `Shared evidence / notes:\n${state.groupNotes[group.id]}` : "", state.notes[item.id] ? `Individual notes:\n${state.notes[item.id]}` : ""].filter(Boolean).join("\n\n");
     }
     const outcomes = grouped.groups.map(group => `${grouped.statusFor(state, group)}: ${group.title}`).join("\n");
-    return { state: { ...state, answers: effectiveAnswers(), notes }, catalog: { ...catalog, version: `${catalog.version} / experimental grouping ${grouped.revision}`, answerGuidance: `EXPERIMENTAL GROUPED REVIEW: 18 questions retain all 96 original controls. Answers inherited from a group decision are identified in each control's notes. No group gap is assumed to fail every underlying control.\n\nGroup outcomes:\n${outcomes}\n\n${catalog.answerGuidance}` } };
+    return { state: { ...state, answers: effectiveAnswers(), notes }, catalog: { ...catalog, version: `${catalog.version} / experimental grouping ${grouped.revision}`, answerGuidance: `EXPERIMENTAL GROUPED REVIEW: ${grouped.groups.length} questions retain all ${catalog.items.length} original controls. Answers inherited from a group decision are identified in each control's notes. No group gap is assumed to fail every underlying control.\n\nGroup outcomes:\n${outcomes}\n\n${catalog.answerGuidance}` } };
   }
   function download(content, filename) {
     const url = URL.createObjectURL(new Blob([content], { type: "text/markdown;charset=utf-8" })), anchor = el("a"); anchor.href = url; anchor.download = filename; anchor.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
@@ -216,7 +216,7 @@
     try {
       if (format === "md") download(window.CRADetailedReport.markdown(snapshot.state, snapshot.catalog, options).replace("# CRA readiness detailed report", "# CRA readiness experimental grouped report"), "Apriorit-CRA-Experimental.md");
       else { const pdf = await window.CRADetailedReport.createPdf(snapshot.state, snapshot.catalog, options); pdf.setProperties({ title: "CRA readiness experimental grouped report" }); pdf.save("Apriorit-CRA-Experimental.pdf"); }
-      status.textContent = "Download started. All group decisions, shared notes and 96 original controls are included.";
+      status.textContent = `Download started. All group decisions, shared notes and ${catalog.items.length} original controls are included.`;
     } catch (error) { status.textContent = error.message || "Download failed. Please retry."; }
     finally { exporting = false; node.disabled = false; }
   }
@@ -228,7 +228,7 @@
     const bar = el("progress"); bar.max = 18; bar.setAttribute("aria-label", "Grouped questions reviewed"); summary.append(total, el("p", "", "questions reviewed"), bar);
     const counts = el("dl", "dv-counts");
     for (const [key, label] of [["yes", "Yes"], ["no", "No / gap found"], ["na", "Not applicable"], ["unanswered", "Needs verification"]]) { const row = el("div", `dv-count-${key}`), value = el("dd"); value.dataset.gvCount = key; row.append(el("dt", "", label), value); counts.append(row); }
-    const coverage = el("p", "gv-coverage"), covered = el("b"); covered.dataset.gvCount = "controls"; coverage.append(covered, document.createTextNode(" / 96 underlying controls answered")); summary.append(counts, coverage, el("p", "dv-summary-foot", "Review progress, not a compliance score. A group gap may leave individual controls unverified."));
+    const coverage = el("p", "gv-coverage"), covered = el("b"); covered.dataset.gvCount = "controls"; coverage.append(covered, document.createTextNode(` / ${catalog.items.length} underlying controls answered`)); summary.append(counts, coverage, el("p", "dv-summary-foot", "Review progress, not a compliance score. A group gap may leave individual controls unverified."));
     const exports = el("section", "dv-exports"); exports.append(el("h3", "", "Keep your experiment"), el("p", "", "All original checks, sources, group decisions and shared evidence are included."));
     const include = el("input"); include.type = "checkbox"; include.checked = state.includeFileEvidence; include.addEventListener("change", () => { state.includeFileEvidence = include.checked; save(); });
     const includeLabel = el("label", "dv-checkbox"); includeLabel.append(include, document.createTextNode("Include file evidence in PDF and Markdown")); exports.append(includeLabel);
@@ -237,7 +237,7 @@
     sidebar.append(summary, exports);
     const main = el("div", "dv-main"), intro = el("section", "dv-intro"), headingRow = el("div", "dv-heading-row");
     const heading = el("h2", "", "Grouped developer verification"); heading.tabIndex = -1; const saved = el("span", "gv-save-state"); saved.setAttribute("role", "status"); headingRow.append(heading, saved);
-    intro.append(headingRow, el("p", "", "18 evidence-led questions. Full coverage of the same 96 developer controls. Review shared evidence once, then focus on gaps and exceptions."));
+    intro.append(headingRow, el("p", "", `${grouped.groups.length} evidence-led questions. Full coverage of the same ${catalog.items.length} developer controls. Review shared evidence once, then focus on gaps and exceptions.`));
     const how = el("div", "gv-how");
     for (const [title, body] of [["1. Gather once", "Use the suggested evidence bundle or ask your project agent for a first pass."], ["2. Decide as a group", "Yes: every applicable check is verified. No: a confirmed gap. N/A: the entire group is outside scope."], ["3. Review exceptions", "Expand original checks for mixed applicability, known failures or unknowns. Individual answers always take precedence."]]) { const step = el("div"); step.append(el("strong", "", title), el("p", "", body)); how.append(step); }
     const metadataRow = el("div", "dv-metadata"); metadataRow.append(metadata("product", "Product / project (optional)", "Product and release/version"), metadata("reviewer", "Reviewer (optional)", "Your name or team"));

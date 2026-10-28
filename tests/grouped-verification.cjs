@@ -8,8 +8,8 @@ for (const name of ["detailed-catalog", "grouped-catalog"]) vm.runInNewContext(f
 const catalog = sandbox.window.CRADetailedCatalog, grouped = sandbox.window.CRAGroupedCatalog;
 const ids = Array.from(grouped.groups.flatMap(group => group.ids));
 assert.equal(grouped.groups.length, 18);
-assert.equal(ids.length, 96);
-assert.equal(new Set(ids).size, 96);
+assert.equal(ids.length, catalog.items.length);
+assert.equal(new Set(ids).size, catalog.items.length);
 assert.deepEqual(ids.slice().sort(), Array.from(catalog.items.map(item => item.id)).sort());
 const group = grouped.groups[0], id = group.ids[0];
 let state = { groupAnswers: { [group.id]: "Yes" }, answers: {} };
@@ -37,7 +37,7 @@ const server = http.createServer((req, res) => {
     await context.addInitScript(() => {
       if (sessionStorage.getItem("grouped-test-seeded")) return;
       localStorage.setItem("cra-readiness-assessment-v1", JSON.stringify({ product: "General project retained", reviewer: "General reviewer", answers: { 0: "Have it" }, notes: { 0: "General evidence retained" } }));
-      localStorage.setItem("cra-detailed-assessment-v1", JSON.stringify({ version: 1, catalogRevision: 3, product: "Detailed project retained", reviewer: "Detailed reviewer", answers: { "product-boundaries": "No" }, notes: { "product-boundaries": "Detailed evidence retained" } }));
+      localStorage.setItem("cra-detailed-assessment-v1", JSON.stringify({ version: 1, catalogRevision: 4, product: "Detailed project retained", reviewer: "Detailed reviewer", answers: { "product-boundaries": "No" }, notes: { "product-boundaries": "Detailed evidence retained" } }));
       sessionStorage.setItem("grouped-test-seeded", "yes");
     });
     const page = await context.newPage(), errors = [];
@@ -58,7 +58,7 @@ const server = http.createServer((req, res) => {
     await page.keyboard.press("ArrowRight"); assert.equal(await general.isVisible(), true);
     await page.keyboard.press("ArrowLeft"); assert.equal(await panel.isVisible(), true);
     await page.keyboard.press("ArrowLeft"); assert.equal(await detail.isVisible(), true); await tab.click();
-    assert.equal(await panel.locator(".gv-question").count(), 18); assert.equal(await panel.locator(".gv-control").count(), 96);
+    assert.equal(await panel.locator(".gv-question").count(), 18); assert.equal(await panel.locator(".gv-control").count(), catalog.items.length);
     const originalStorage = await existing();
     await panel.getByLabel("Product / project (optional)", { exact: true }).fill("Experimental release 1.0");
     const card = panel.locator(`#grouped-question-${group.id}`);
@@ -92,7 +92,7 @@ const server = http.createServer((req, res) => {
     assert.ok(prompt.includes("shared evidence bundles") && prompt.includes('"id": "product-boundaries"') && prompt.includes("Do not infer runtime behavior"));
     const openImport = async results => {
       await panel.locator(".gv-import").evaluate(node => { node.open = true; });
-      await panel.getByLabel("Agent results JSON", { exact: true }).fill(JSON.stringify({ format: "cra-detailed-agent-review", version: 1, catalogRevision: 3, results }));
+      await panel.getByLabel("Agent results JSON", { exact: true }).fill(JSON.stringify({ format: "cra-detailed-agent-review", version: 1, catalogRevision: catalog.revision, results }));
       await panel.getByRole("button", { name: "Preview agent results", exact: true }).click();
     };
     const finding = { id, answer: "Yes", notes: "Agent finding", fileEvidence: [{ path: "src/proof.ts", line: 9, description: "FILE-PROOF-SENTINEL" }] };
@@ -124,7 +124,7 @@ const server = http.createServer((req, res) => {
     const md = await download; const mdPath = path.join(output, "grouped.md"); await md.saveAs(mdPath);
     let text = fs.readFileSync(mdPath, "utf8");
     assert.ok(text.startsWith("# CRA readiness experimental grouped report"));
-    assert.equal((text.match(/\*\*Control ID:\*\*/g) || []).length, 96);
+    assert.equal((text.match(/\*\*Control ID:\*\*/g) || []).length, catalog.items.length);
     assert.ok(text.includes("SHARED-EVIDENCE-SENTINEL") && text.includes("Group outcome: No")); assert.ok(!text.includes("FILE-PROOF-SENTINEL"));
     await panel.getByLabel("Include file evidence in PDF and Markdown", { exact: true }).check();
     const withFiles = page.waitForEvent("download"); await panel.getByRole("button", { name: "Download Markdown", exact: true }).click();
@@ -148,6 +148,6 @@ const server = http.createServer((req, res) => {
     assert.ok((await blockedPage.locator(".gv-save-state").innerText()).includes("unavailable"));
     await blockedPage.locator(".gv-question").first().getByRole("radio", { name: "Yes", exact: true }).check();
     assert.equal(await blockedPage.locator("[data-gv-count=reviewed]").innerText(), "1"); await blocked.close();
-    assert.deepEqual(errors, []); console.log(JSON.stringify({ result: "PASS", questions: 18, controls: 96, output, browserErrors: errors }, null, 2));
+    assert.deepEqual(errors, []); console.log(JSON.stringify({ result: "PASS", questions: 18, controls: catalog.items.length, output, browserErrors: errors }, null, 2));
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; }).finally(() => server.close());
