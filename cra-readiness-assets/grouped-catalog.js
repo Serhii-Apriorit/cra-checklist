@@ -72,11 +72,11 @@
   add("updates", "Can users receive authentic security fixes safely throughout support?",
     "Review authenticity, interrupted-install recovery, automatic-update controls, separate fixes, access terms, support ownership and update retention as one supported delivery lifecycle.",
     "Signed-update and interrupted-install tests + user update controls/instructions + published support/access policy and retained-update arrangements.",
-    "update-authenticity-integrity update-installation-recovery automatic-update-controls separate-security-updates updates-accessible-advised support-period-owned security-update-retention");
+    "update-authenticity-integrity automatic-update-controls separate-security-updates updates-accessible-advised support-period-owned security-update-retention");
   add("response", "Are vulnerability response, reporting and handoff owned and demonstrably workable?",
-    "Trace a report through intake, component monitoring, triage/remediation, advisory and applicable reporting. Confirm measured response targets, responsibility boundaries and release-linked maintainer evidence.",
-    "One response/handoff evidence pack: intake and monitoring ownership, timed exercise or case records, advisories, reporting runbook, responsibility matrix and delivery acknowledgement.",
-    "vulnerability-remediation-timely vulnerability-intake-disclosure component-monitoring-owner fixed-vulnerability-advisories article14-reporting-ready contract-roles-responsibilities escalation-service-levels security-evidence-handoff");
+    "Trace a report through intake, component monitoring, triage/remediation, advisory and applicable reporting. Confirm measured response targets, escalation routes and release-linked maintainer evidence.",
+    "One response/handoff evidence pack: intake and monitoring ownership, timed exercise or case records, advisories, reporting runbook, escalation matrix and delivery acknowledgement.",
+    "vulnerability-remediation-timely vulnerability-intake-disclosure component-monitoring-owner fixed-vulnerability-advisories article14-reporting-ready escalation-service-levels security-evidence-handoff");
   const ids = groups.flatMap(group => group.ids);
   if (new Set(ids).size !== ids.length || ids.length !== catalog.items.length || ids.some(id => !catalog.items.some(item => item.id === id))) throw new Error("Experimental groups must cover every current control exactly once.");
   const groupFor = id => groups.find(group => group.ids.includes(id));

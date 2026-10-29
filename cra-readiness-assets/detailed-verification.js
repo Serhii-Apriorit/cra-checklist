@@ -163,8 +163,9 @@
     input.maxLength = 300;
     input.value = state[fieldName];
     input.placeholder = placeholder;
+    input.required = true;
     input.dataset.field = fieldName;
-    input.addEventListener("input", () => { state[fieldName] = input.value; save(); });
+    input.addEventListener("input", () => { state[fieldName] = input.value; save(); updateExportGate(); });
     wrap.append(input);
     return wrap;
   }
@@ -435,6 +436,24 @@
       const reviewed = items.filter(item => state.answers[item.id]).length;
       groups.get(category.id).querySelector(".dv-group-progress").textContent = `${reviewed} / ${items.length} reviewed`;
     }
+    updateExportGate();
+  }
+
+  function exportBlocker() {
+    if (catalog.items.some(item => !choices.includes(state.answers[item.id]))) return "You must answer all questions.";
+    if (!(state.product || "").trim() || !(state.reviewer || "").trim()) return "Enter the product / project and reviewer.";
+    return "";
+  }
+
+  function updateExportGate() {
+    const reason = exportBlocker();
+    for (const gate of mountPoint.querySelectorAll(".dv-export-gate")) {
+      gate.dataset.tooltip = reason;
+      gate.classList.toggle("dv-export-blocked", Boolean(reason));
+      gate.querySelector("button").disabled = Boolean(reason) || exporting;
+    }
+    const hint = mountPoint.querySelector(".dv-export-hint");
+    if (hint) hint.textContent = reason;
   }
 
   function applyFilters(previousCard) {
@@ -467,7 +486,7 @@
   }
 
   async function exportAssessment(format, node) {
-    if (exporting) return;
+    if (exporting || exportBlocker()) return;
     exporting = true;
     node.disabled = true;
     node.setAttribute("aria-busy", "true");
@@ -484,8 +503,8 @@
       message.textContent = error.message || "The download could not be created. Please retry.";
     } finally {
       exporting = false;
-      node.disabled = false;
       node.removeAttribute("aria-busy");
+      updateExportGate();
     }
   }
 
@@ -545,10 +564,15 @@
     evidenceOption.append(includeEvidence, document.createTextNode("Include file evidence in PDF and Markdown"));
     exports.append(evidenceOption);
     exports.append(el("small", "", "Review notes are always included. This option controls the separate file evidence field."));
+    const hint = el("p", "sr-only dv-export-hint"); hint.id = "dv-export-hint";
     for (const [format, title] of [["pdf", "Download PDF"], ["md", "Download Markdown"]]) {
       const node = button(title, `button ${format === "pdf" ? "primary" : "secondary"}`, () => exportAssessment(format, node));
-      exports.append(node);
+      node.setAttribute("aria-describedby", hint.id);
+      const gate = el("span", "dv-export-gate");
+      gate.append(node);
+      exports.append(gate);
     }
+    exports.append(hint);
     const message = el("p", "dv-export-status"); message.setAttribute("role", "status");
     exports.append(message, el("small", "", "Your answers stay in this browser."));
     sidebar.append(progress, exports);
@@ -559,7 +583,7 @@
     const saved = el("span", "dv-save-state"); saved.setAttribute("role", "status");
     headingRow.append(heading, saved);
     const meta = el("div", "dv-metadata");
-    meta.append(field("Product / project (optional)", "product", "e.g. Acme Platform"), field("Reviewer (optional)", "reviewer", "Your name or team"));
+    meta.append(field("Product / project (required)", "product", "e.g. Acme Platform"), field("Reviewer (required)", "reviewer", "Your name or team"));
     intro.append(headingRow, el("p", "", `${catalog.answerGuidance} Evidence and notes are optional.`), meta);
     if (migrationNotice) {
       const notice = el("p", "dv-migration-notice", migrationNotice);
