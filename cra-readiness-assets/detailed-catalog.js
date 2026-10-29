@@ -536,7 +536,7 @@
     "Conditional: products offering recovery, rescue or maintenance modes; distinguish from ordinary configuration reset. Products without such modes can mark Not applicable.", ENG, ["I2b", "I2f", "I2h"]);
 
   group = "resilience";
-  add(group, "essential-functions-defined", "Are essential functions and their acceptable reduced service level during attacks or failures documented and tested?", "High",
+  add(group, "essential-functions-defined", "Has it been defined and tested how essential functions should operate during an attack or failure?", "High",
     [
       "List the essential functions that must keep working or recover first during an attack or failure, for example: sign-in, safety alarms, core data processing or update delivery.",
       "Acceptable degradation is the documented reduced service level you accept while under attack or partial failure, such as slower responses, disabled non-essential features, read-only mode or queued processing, provided essential functions remain available and secure.",
