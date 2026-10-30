@@ -61,7 +61,7 @@ if the entire item is outside the product context. Leave unreviewed items
 unanswered. Related controls distinguish mechanisms, trust boundaries and
 lifecycle stages; shared evidence can support more than one item.
 
-The detailed catalog contains 94 controls after consolidating repeated risk
+The detailed catalog contains 92 controls after consolidating repeated risk
 reviews, requirements matrices, authorization checks, platform/debug reviews,
 identity/storage protection and alert-response checks. Each combined control
 retains the applicable scenarios from its former items. Catalog revision 2
@@ -92,6 +92,18 @@ least privilege, and clarifies resource-access and logging opt-out wording.
 Longer verification instructions use bullet lists inside the existing collapsed
 “How to verify / evidence” section. An earlier Yes for privileged access becomes
 unanswered for review; the previous answer and notes are preserved.
+
+Catalog revision 6 limits incident containment to critical components, clarifies
+event coverage, logging opt-out applicability, pipeline compromise, project
+training, Article 14 reporting and handoff questions, merges update-installation
+recovery into update authenticity using the revision 2 rules, and removes the
+contractual responsibility question. The checklist contains 92 controls.
+
+Detailed PDF and Markdown downloads require a product/project, a reviewer and
+an answer for every control; until then the buttons are disabled and hovering
+shows the reason. Reports show dates as YYYY-MM-DD, answer guidance and
+verification steps as bullets, summary tables, the answer above each question,
+and notes only where recorded.
 
 Detailed verification includes **Review with your project agent**. Copy a prompt
 for unanswered controls (or all controls) to an agent with project access, then
@@ -129,7 +141,7 @@ N/A, and is not a compliance score. Unresolved priority counts include No and
 unanswered items, excluding N/A.
 
 **Grouped verification**, the third tab, is an independent experiment with 18
-broader, evidence-led questions. It maps each of the 94 detailed controls to
+broader, evidence-led questions. It maps each of the 92 detailed controls to
 exactly one evidence bundle without changing the first two assessments. Each
 question suggests evidence to review once; expand **Coverage and individual
 exceptions** for the full original wording, priority, applicability and sources.
@@ -152,7 +164,7 @@ JSON validation and preview-before-apply workflow. Inherited answers are kept
 unless replacement is selected. Unknown agent findings never erase answers.
 Code inspection alone cannot establish deployed behavior or operational evidence.
 
-Experimental PDF/Markdown exports retain all 18 group outcomes, 94 original
+Experimental PDF/Markdown exports retain all 18 group outcomes, 92 original
 controls, shared/individual notes and each answer's origin, even when filtered.
 Separate file references remain opt-in. Reset affects only the experiment. If
 the catalog or grouping revision changes, group decisions and individual passes

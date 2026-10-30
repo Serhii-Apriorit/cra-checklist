@@ -31,6 +31,10 @@
 .dv-exports h3 { font-size:15px; margin:0 0 8px; }
 .dv-exports p { font-size:11px; color:#626262; }
 .dv-exports .button { width:100%; justify-content:center; margin:8px 0 0; font-size:12px; }
+.dv-export-gate { position:relative; display:block; }
+.dv-exports .button:disabled { opacity:.45; cursor:not-allowed; pointer-events:none; }
+.dv-export-gate.dv-export-blocked { cursor:not-allowed; }
+.dv-export-gate.dv-export-blocked:hover::after { content:attr(data-tooltip); position:absolute; left:50%; bottom:calc(100% + 6px); transform:translateX(-50%); width:max-content; max-width:240px; padding:6px 10px; border-radius:4px; background:#222; color:#fff; font-size:11px; line-height:1.4; text-align:center; z-index:10; pointer-events:none; }
 .dv-export-status:empty { display:none; }
 .dv-export-status { overflow-wrap:anywhere; }
 .dv-reset, .dv-clear, .dv-clear-filters { background:none; border:0; color:#626262; text-decoration:underline; cursor:pointer; font:inherit; font-size:11px; text-underline-offset:3px; }

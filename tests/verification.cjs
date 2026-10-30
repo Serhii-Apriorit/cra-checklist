@@ -13,11 +13,11 @@ vm.runInNewContext(fs.readFileSync(path.join(repo, "cra-readiness-assets/detaile
 const catalog = context.window.CRADetailedCatalog;
 assert.ok(catalog.items.length >= 80 && catalog.items.length <= 120);
 assert.equal(catalog.categories.length, 12);
-assert.equal(catalog.items.length, 94);
-assert.equal(catalog.revision, 5);
+assert.equal(catalog.items.length, 92);
+assert.equal(catalog.revision, 6);
 assert.equal(catalog.items.filter(item => item.reviewRevision === 3).length, 6);
 assert.equal(catalog.items.filter(item => item.reviewRevision === 5).length, 1);
-assert.equal(catalog.items.reduce((count, item) => count + item.mergedFrom.length, 0), 14);
+assert.equal(catalog.items.reduce((count, item) => count + item.mergedFrom.length, 0), 15);
 for (const item of catalog.items) {
   for (const former of item.mergedFrom) assert.ok(!catalog.items.some(control => control.id === former.id), `Retired control still displayed: ${former.id}`);
 }
@@ -76,13 +76,13 @@ const server = http.createServer((req, res) => {
     const [a, b, c] = catalog.items;
     const card = id => detail.locator(`[id="control-${id}"]`);
     // Multi-step guidance stays collapsed; expanding it exposes every check once.
-    const recoveryGuidance = card("update-installation-recovery").locator(".dv-guidance");
+    const recoveryGuidance = card("update-authenticity-integrity").locator(".dv-guidance");
     assert.equal(await recoveryGuidance.getAttribute("open"), null);
     assert.equal(await recoveryGuidance.locator("ul").isVisible(), false);
     await recoveryGuidance.locator("summary").click();
-    const recoveryChecks = catalog.items.find(item => item.id === "update-installation-recovery").verificationChecks;
+    const recoveryChecks = catalog.items.find(item => item.id === "update-authenticity-integrity").verificationChecks;
     assert.deepEqual(await recoveryGuidance.locator("li").allTextContents(), Array.from(recoveryChecks));
-    assert.equal(await card("update-installation-recovery").locator("h4").innerText(), "Can an interrupted or failed security update return the product to a supported working state?");
+    assert.equal(await card("update-authenticity-integrity").locator("h4").innerText(), "Does the product install only authentic, intended updates and stay updatable if an installation fails?");
     await recoveryGuidance.locator("summary").click();
     await card(a.id).getByRole("radio", { name: "Yes", exact: true }).check();
     await card(b.id).getByRole("radio", { name: "No", exact: true }).check();
@@ -176,12 +176,21 @@ const server = http.createServer((req, res) => {
     await detail.getByRole("button", { name: "Clear filters", exact: true }).click();
     await detail.locator("[data-filter=answer]").selectOption("Not applicable");
     assert.equal(await detail.locator(".dv-control:visible").count(), 1);
+    // Reports stay disabled until every control is answered.
+    assert.equal(await detail.getByRole("button", { name: "Download PDF", exact: true }).isDisabled(), true);
+    assert.equal(await detail.locator(".dv-export-gate").first().getAttribute("data-tooltip"), "You must answer all questions.");
+    const filledIds = await page.evaluate(() => [...document.querySelectorAll("#detailed-verification-panel .dv-control")]
+      .filter(node => node.dataset.answer === "Unanswered")
+      .map(node => { node.querySelector("input[value='Not applicable']").click(); return node.id; }));
+    assert.equal(await detail.getByRole("button", { name: "Download PDF", exact: true }).isDisabled(), false);
     const mdDownload = page.waitForEvent("download");
     await detail.getByRole("button", { name: "Download Markdown", exact: true }).click();
     const mdFile = path.join(output, "detailed.md");
     await (await mdDownload).saveAs(mdFile);
     const markdown = fs.readFileSync(mdFile, "utf8");
     for (const item of catalog.items) assert.ok(markdown.includes(item.id), `Export missing ${item.id}`);
+    assert.match(markdown, /\*\*Last updated:\*\* \d{4}-\d{2}-\d{2} /);
+    assert.ok(!markdown.includes("**Basis**") && !markdown.includes("No notes recorded"));
     assert.ok(markdown.includes("END-OF-LONG-NOTE"));
     assert.ok(!markdown.includes("<script>"));
     assert.ok(markdown.includes("&lt;script&gt;"));
@@ -198,6 +207,7 @@ const server = http.createServer((req, res) => {
     const evidencePdfDownload = page.waitForEvent("download", { timeout: 120000 });
     await detail.getByRole("button", { name: "Download PDF", exact: true }).click();
     await (await evidencePdfDownload).saveAs(path.join(output, "detailed-with-file-evidence.pdf"));
+    await page.evaluate(ids => { for (const id of ids) document.getElementById(id).querySelector(".dv-clear").click(); }, filledIds);
     await page.reload();
     await page.getByRole("tab", { name: /Detailed verification/ }).click();
     assert.equal(await detail.locator("[data-field=product]").inputValue(), malicious);
@@ -292,10 +302,9 @@ const server = http.createServer((req, res) => {
     await page.reload();
     await page.getByRole("tab", { name: /Detailed verification/ }).click();
     assert.equal(await card("risk-assessment-current").locator("textarea").inputValue(), migratedNotes, "Migration must be idempotent");
-    const mergedMdDownload = page.waitForEvent("download");
-    await detail.getByRole("button", { name: "Download Markdown", exact: true }).click();
-    await (await mergedMdDownload).saveAs(path.join(output, "consolidated.md"));
-    assert.ok(fs.readFileSync(path.join(output, "consolidated.md"), "utf8").includes("THREAT-END"));
+    assert.equal(await detail.getByRole("button", { name: "Download Markdown", exact: true }).isDisabled(), true);
+    const consolidated = await page.evaluate(() => window.CRADetailedReport.markdown(JSON.parse(localStorage.getItem("cra-detailed-assessment-v1")), window.CRADetailedCatalog));
+    assert.ok(consolidated.includes("THREAT-END"));
     // Expanded evidence requirements invalidate only old passes, without re-running consolidation.
     const expandedIds = catalog.items.filter(item => item.reviewRevision === 3).map(item => item.id);
     await page.evaluate(ids => localStorage.setItem("cra-detailed-assessment-v1", JSON.stringify({

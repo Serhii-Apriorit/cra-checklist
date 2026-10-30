@@ -4,11 +4,29 @@
   let fontsPromise;
   const STATUS = ["Yes", "No", "Not applicable"];
   const COLORS = { Yes: "#187657", No: "#b63828", "Not applicable": "#365ba5", Unanswered: "#666666" };
+  // Matches the selected-answer styles in detailed-verification.css.
+  const BADGES = {
+    Yes: { fill: "#eff8f4", border: "#76aa98", icon: "✅" },
+    No: { fill: "#fff2f0", border: "#d9a097", icon: "❌" },
+    "Not applicable": { fill: "#f0f4fc", border: "#9bafd4", icon: "`N/A`" },
+    Unanswered: { fill: "#f5f5f5", border: "#cccccc", icon: "❔" }
+  };
 
   const clean = value => String(value == null ? "" : value)
     .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/g, "");
   const statusFor = (state, id) => STATUS.includes(state?.answers?.[id]) ? state.answers[id] : "Unanswered";
   const itemsFor = catalog => Array.isArray(catalog?.items) ? catalog.items : [];
+  const hasText = value => typeof value === "string" && value.trim() !== "";
+  const isoDate = value => {
+    const date = new Date(value);
+    if (!value || Number.isNaN(date.getTime())) return "Not recorded";
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  };
+  const sentences = value => clean(value).split(/\n+/)
+    .flatMap(line => line.split(/(?<=[.!?])\s+(?=[A-Z])/))
+    .map(line => line.trim()).filter(Boolean);
+  const checksFor = item => Array.isArray(item.verificationChecks) && item.verificationChecks.length
+    ? item.verificationChecks : sentences(item.guidance || "Not provided");
   const countSummary = (state, catalog) => {
     const items = itemsFor(catalog);
     const counts = { Yes: 0, No: 0, "Not applicable": 0, Unanswered: 0 };
@@ -67,35 +85,37 @@
   };
 
   function markdown(state = {}, catalog = {}, options = { includeFileEvidence: false }) {
-    const { items, counts, reviewed, total, unresolvedPriority } = countSummary(state, catalog);
+    const { items, counts, total, unresolvedPriority } = countSummary(state, catalog);
     const categories = Array.isArray(catalog.categories) ? catalog.categories : [];
     const categoryTitle = Object.fromEntries(categories.map(category => [category.id, category.title]));
     const out = [
       `# CRA readiness detailed report`, "",
-      `**Product / project:** ${md(state.product || "Not specified")}`,
-      `**Reviewer:** ${md(state.reviewer || "Not specified")}`,
-      `**Updated:** ${md(state.updated || "Not recorded")}`,
+      `**Product / project:** ${md(state.product || "Not specified")}  `,
+      `**Reviewer:** ${md(state.reviewer || "Not specified")}  `,
+      `**Last updated:** ${md(isoDate(state.updated))}  `,
       `**Catalog version:** ${md(catalog.version || "Not specified")} (revision ${md(catalog.revision || 1)})`, "",
       "> Engineering readiness aid. Priority labels guide engineering work and are not legal classifications. This self-assessment is not a conformity assessment, legal determination, or certification.", "",
-      ...(catalog.answerGuidance ? [md(catalog.answerGuidance), ""] : []),
+      ...(catalog.answerGuidance ? ["## How to answer", "", ...sentences(catalog.answerGuidance).map(line => `- ${md(line)}`), ""] : []),
       "## Summary", "",
-      `- Reviewed: **${reviewed} / ${total}**`,
-      `- Yes: **${counts.Yes}**`, `- No: **${counts.No}**`,
-      `- Not applicable: **${counts["Not applicable"]}**`, `- Unanswered: **${counts.Unanswered}**`,
-      `- Unresolved Critical (No or unanswered): **${unresolvedPriority.Critical}**`,
-      `- Unresolved High (No or unanswered): **${unresolvedPriority.High}**`, ""
+      "| Answer | Controls |", "| --- | ---: |",
+      `| Yes | ${counts.Yes} |`, `| No | ${counts.No} |`, `| Not applicable | ${counts["Not applicable"]} |`,
+      ...(counts.Unanswered ? [`| Unanswered | ${counts.Unanswered} |`] : []),
+      `| **Total** | **${total}** |`, "",
+      "**Needs remediation (No or unanswered)**", "",
+      "| Priority | Controls |", "| --- | ---: |",
+      `| Critical | ${unresolvedPriority.Critical} |`, `| High | ${unresolvedPriority.High} |`, ""
     ];
     for (const [index, item] of items.entries()) {
       const answer = statusFor(state, item.id);
       const category = categoryTitle[item.category] || item.category || "Uncategorized";
       const note = state.notes?.[item.id];
-      out.push(`## ${index + 1}. ${md(item.title || "Untitled item")}`, "",
-        `- **Control ID:** ${md(item.id || "Not specified")}`, `- **Category:** ${md(category)}`, `- **Priority:** ${md(item.priority || "Not specified")}`,
-        `- **Answer:** ${md(answer)}`, "", `**Guidance**  \n${md(item.guidance || "Not provided")}`, "",
+      out.push(`## ${index + 1}. ${md(item.title || "Untitled item")}`, "", `${BADGES[answer].icon} **${md(answer)}**`, "",
+        `- **Control ID:** ${md(item.id || "Not specified")}`, `- **Category:** ${md(category)}`, `- **Priority:** ${md(item.priority || "Not specified")}`, "",
+        "**Guidance**", "", ...checksFor(item).map(check => `- ${md(check)}`), "",
         `**Evidence**  \n${md(item.evidence || "Not provided")}`, "",
-        `**Applicability**  \n${md(item.applicability || "Not specified")}`, "",
-        `**Basis**  \n${md(item.basis || "Not specified")}`, "",
-        "**Notes**", mdBlock(note), "", "**References**");
+        `**Applicability**  \n${md(item.applicability || "Not specified")}`, "");
+      if (hasText(note)) out.push("**Notes**", mdBlock(note), "");
+      out.push("**References**");
       if (Array.isArray(item.references) && item.references.length) {
         for (const ref of item.references) out.push(`- ${mdLink(ref)}`);
       } else out.push("- None listed");
@@ -178,15 +198,49 @@
       }
       return lines.length ? lines : [""];
     };
-    const text = (value, { size = 10, bold = false, color = "#333333", gap = 3, link } = {}) => {
+    const text = (value, { size = 10, bold = false, color = "#333333", gap = 3, link, indent = 0 } = {}) => {
       const lineHeight = size * 0.35278 * 1.5;
-      for (const line of wrap(value, size, bold)) {
+      for (const line of wrap(value, size, bold, width - indent)) {
         ensure(lineHeight);
         font(size, bold, color);
-        if (link) pdf.textWithLink(line, left, cursor, { url: link }); else pdf.text(line, left, cursor);
+        if (link) pdf.textWithLink(line, left + indent, cursor, { url: link }); else pdf.text(line, left + indent, cursor);
         cursor += lineHeight;
       }
       cursor += gap;
+    };
+    const bullets = (values, { size = 10, color = "#333333" } = {}) => {
+      for (const value of values) {
+        ensure(size * 0.35278 * 1.5);
+        font(size, false, color); pdf.text("•", left + 1, cursor);
+        text(value, { size, color, gap: 1, indent: 5 });
+      }
+      cursor += 2;
+    };
+    const tableRow = (name, value, color = "#333333", bold = false) => {
+      ensure(7);
+      font(10, bold, "#333333"); pdf.text(name, left, cursor);
+      font(10, true, color); pdf.text(String(value), left + 80, cursor, { align: "right" });
+      pdf.setDrawColor("#e3e3e3"); pdf.line(left, cursor + 2, left + 80, cursor + 2);
+      cursor += 7;
+    };
+    const statusBadge = status => {
+      const color = COLORS[status], badge = BADGES[status];
+      const height = 7, padding = 3, gap = 2;
+      ensure(height + 2);
+      font(7, true, color);
+      const iconWidth = status === "Not applicable" ? pdf.getTextWidth("N/A") : 3;
+      font(10, true, color);
+      const top = cursor - 4.8, mid = top + height / 2, x = left + padding;
+      pdf.setLineWidth(0.3); pdf.setDrawColor(badge.border); pdf.setFillColor(badge.fill);
+      pdf.roundedRect(left, top, padding * 2 + iconWidth + gap + pdf.getTextWidth(status), height, 1.2, 1.2, "FD");
+      pdf.setDrawColor(color); pdf.setLineWidth(0.6);
+      if (status === "Yes") { pdf.line(x, mid, x + 1.1, mid + 1.2); pdf.line(x + 1.1, mid + 1.2, x + 3, mid - 1.3); }
+      else if (status === "No") { pdf.line(x + 0.2, mid - 1.3, x + 2.8, mid + 1.3); pdf.line(x + 0.2, mid + 1.3, x + 2.8, mid - 1.3); }
+      else if (status === "Not applicable") { font(7, true, color); pdf.text("N/A", x, mid + 0.9); }
+      else pdf.line(x, mid, x + 3, mid);
+      font(10, true, color); pdf.text(status, x + iconWidth + gap, cursor);
+      pdf.setLineWidth(0.2);
+      cursor += height;
     };
     const label = value => text(value.toUpperCase(), { size: 8, bold: true, color: "#626262", gap: 1 });
     const section = value => { ensure(40); cursor += 3; text(value, { size: 15, bold: true, color: "#222222", gap: 4 }); };
@@ -195,27 +249,34 @@
     text("CRA readiness detailed report", { size: 23, bold: true, color: "#222222", gap: 6 });
     label("Product / project"); text(state.product || "Not specified", { size: 12, bold: true });
     label("Reviewer"); text(state.reviewer || "Not specified");
-    label("Last updated"); text(state.updated || "Not recorded");
+    label("Last updated"); text(isoDate(state.updated));
     text(`Catalog version: ${catalog.version || "Not specified"} (revision ${catalog.revision || 1})`, { size: 9, color: "#626262" });
     text("Engineering priority labels guide engineering work and are not legal classifications. This self-assessment is not a conformity assessment, legal determination, or certification.", { size: 9, color: "#626262", gap: 5 });
-    if (catalog.answerGuidance) text(catalog.answerGuidance, { size: 9, color: "#626262", gap: 5 });
+    if (catalog.answerGuidance) { section("How to answer"); bullets(sentences(catalog.answerGuidance), { size: 9 }); }
     section("Summary");
-    text(`Reviewed: ${summary.reviewed} / ${summary.total}    Yes: ${summary.counts.Yes}    No: ${summary.counts.No}`, { size: 10, bold: true });
-    text(`Not applicable: ${summary.counts["Not applicable"]}    Unanswered: ${summary.counts.Unanswered}`, { size: 10 });
-    text(`Unresolved Critical (No or unanswered): ${summary.unresolvedPriority.Critical}`, { size: 10, bold: true });
-    text(`Unresolved High (No or unanswered): ${summary.unresolvedPriority.High}`, { size: 10, bold: true });
+    tableRow("Yes", summary.counts.Yes, COLORS.Yes);
+    tableRow("No", summary.counts.No, COLORS.No);
+    tableRow("Not applicable", summary.counts["Not applicable"], COLORS["Not applicable"]);
+    if (summary.counts.Unanswered) tableRow("Unanswered", summary.counts.Unanswered, COLORS.Unanswered);
+    tableRow("Total", summary.total, "#222222", true);
+    cursor += 4;
+    label("Needs remediation (No or unanswered)"); cursor += 3;
+    tableRow("Critical", summary.unresolvedPriority.Critical);
+    tableRow("High", summary.unresolvedPriority.High);
 
+    nextPage();
     section("Detailed assessment");
     for (const [index, item] of summary.items.entries()) {
-      ensure(40);
-      pdf.setDrawColor("#fc6113"); pdf.line(left, cursor - 2, left + 12, cursor - 2); cursor += 4;
+      const status = statusFor(state, item.id);
+      const note = state.notes?.[item.id];
+      ensure(48);
       text(`${index + 1}. ${item.title || "Untitled item"}`, { size: 13, bold: true, color: "#222222", gap: 2 });
-      text(`Control ID: ${item.id || "Not specified"} | ${categoryTitle[item.category] || item.category || "Uncategorized"} | ${item.priority || "Priority not specified"} | ${statusFor(state, item.id)}`, { size: 9, bold: true, color: COLORS[statusFor(state, item.id)] });
-      label("Guidance"); text(item.guidance || "Not provided");
+      statusBadge(status);
+      text(`Control ID: ${item.id || "Not specified"} | ${categoryTitle[item.category] || item.category || "Uncategorized"} | ${item.priority || "Priority not specified"}`, { size: 9, color: "#626262" });
+      label("Guidance"); bullets(checksFor(item));
       label("Evidence"); text(item.evidence || "Not provided");
       label("Applicability"); text(item.applicability || "Not specified");
-      label("Basis"); text(item.basis || "Not specified");
-      label("Notes"); text(state.notes?.[item.id] || "No notes recorded.", { color: state.notes?.[item.id] ? "#222222" : "#777777" });
+      if (hasText(note)) { label("Notes"); text(note, { color: "#222222" }); }
       label("References");
       if (Array.isArray(item.references) && item.references.length) {
         for (const ref of item.references) text(ref.label || ref.url || "Reference", { size: 8, color: "#b33e05", gap: 1, link: ref.url || undefined });
@@ -227,17 +288,17 @@
           text(`${entry.path}:${entry.line}${entry.description ? ` - ${entry.description}` : ""}`, { size: 9 });
         }
       }
-      cursor += 5;
+      cursor += 10;
     }
 
     const pageCount = pdf.getNumberOfPages();
     for (let pageNumber = 1; pageNumber <= pageCount; pageNumber++) {
       pdf.setPage(pageNumber);
       font(15, true, "#222222"); pdf.text("Apriorit", left, 15);
-      font(8, false, "#626262"); pdf.text("CYBER RESILIENCE ACT / DETAILED READINESS", left + width, 15, { align: "right" });
+      font(8, false, "#626262"); pdf.text("CYBER RESILIENCE ACT", left + width, 15, { align: "right" });
       pdf.setDrawColor("#fc6113"); pdf.setLineWidth(0.6); pdf.line(left, 20, left + width, 20);
       pdf.setLineWidth(0.2); pdf.setDrawColor("#dddddd"); pdf.line(left, 282, left + width, 282);
-      font(8, false, "#626262"); pdf.text("Apriorit | Engineering self-assessment | Not a certification", left, 288);
+      font(8, false, "#626262"); pdf.text("Apriorit | Not a certification", left, 288);
       pdf.text(`${pageNumber} / ${pageCount}`, left + width, 288, { align: "right" });
     }
     return pdf;
