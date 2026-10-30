@@ -4,6 +4,13 @@
   let fontsPromise;
   const STATUS = ["Yes", "No", "Not applicable"];
   const COLORS = { Yes: "#187657", No: "#b63828", "Not applicable": "#365ba5", Unanswered: "#666666" };
+  // Matches the selected-answer styles in detailed-verification.css.
+  const BADGES = {
+    Yes: { fill: "#eff8f4", border: "#76aa98", icon: "✅" },
+    No: { fill: "#fff2f0", border: "#d9a097", icon: "❌" },
+    "Not applicable": { fill: "#f0f4fc", border: "#9bafd4", icon: "`N/A`" },
+    Unanswered: { fill: "#f5f5f5", border: "#cccccc", icon: "❔" }
+  };
 
   const clean = value => String(value == null ? "" : value)
     .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/g, "");
@@ -102,7 +109,7 @@
       const answer = statusFor(state, item.id);
       const category = categoryTitle[item.category] || item.category || "Uncategorized";
       const note = state.notes?.[item.id];
-      out.push(`**Answer: ${md(answer)}**`, "", `## ${index + 1}. ${md(item.title || "Untitled item")}`, "",
+      out.push(`## ${index + 1}. ${md(item.title || "Untitled item")}`, "", `${BADGES[answer].icon} **${md(answer)}**`, "",
         `- **Control ID:** ${md(item.id || "Not specified")}`, `- **Category:** ${md(category)}`, `- **Priority:** ${md(item.priority || "Not specified")}`, "",
         "**Guidance**", "", ...checksFor(item).map(check => `- ${md(check)}`), "",
         `**Evidence**  \n${md(item.evidence || "Not provided")}`, "",
@@ -216,6 +223,25 @@
       pdf.setDrawColor("#e3e3e3"); pdf.line(left, cursor + 2, left + 80, cursor + 2);
       cursor += 7;
     };
+    const statusBadge = status => {
+      const color = COLORS[status], badge = BADGES[status];
+      const height = 7, padding = 3, gap = 2;
+      ensure(height + 2);
+      font(7, true, color);
+      const iconWidth = status === "Not applicable" ? pdf.getTextWidth("N/A") : 3;
+      font(10, true, color);
+      const top = cursor - 4.8, mid = top + height / 2, x = left + padding;
+      pdf.setLineWidth(0.3); pdf.setDrawColor(badge.border); pdf.setFillColor(badge.fill);
+      pdf.roundedRect(left, top, padding * 2 + iconWidth + gap + pdf.getTextWidth(status), height, 1.2, 1.2, "FD");
+      pdf.setDrawColor(color); pdf.setLineWidth(0.6);
+      if (status === "Yes") { pdf.line(x, mid, x + 1.1, mid + 1.2); pdf.line(x + 1.1, mid + 1.2, x + 3, mid - 1.3); }
+      else if (status === "No") { pdf.line(x + 0.2, mid - 1.3, x + 2.8, mid + 1.3); pdf.line(x + 0.2, mid + 1.3, x + 2.8, mid - 1.3); }
+      else if (status === "Not applicable") { font(7, true, color); pdf.text("N/A", x, mid + 0.9); }
+      else pdf.line(x, mid, x + 3, mid);
+      font(10, true, color); pdf.text(status, x + iconWidth + gap, cursor);
+      pdf.setLineWidth(0.2);
+      cursor += height;
+    };
     const label = value => text(value.toUpperCase(), { size: 8, bold: true, color: "#626262", gap: 1 });
     const section = value => { ensure(40); cursor += 3; text(value, { size: 15, bold: true, color: "#222222", gap: 4 }); };
     const list = (value, options = {}) => text(value, options);
@@ -238,14 +264,14 @@
     tableRow("Critical", summary.unresolvedPriority.Critical);
     tableRow("High", summary.unresolvedPriority.High);
 
+    nextPage();
     section("Detailed assessment");
     for (const [index, item] of summary.items.entries()) {
       const status = statusFor(state, item.id);
       const note = state.notes?.[item.id];
       ensure(48);
-      pdf.setDrawColor("#fc6113"); pdf.line(left, cursor - 2, left + 12, cursor - 2); cursor += 4;
-      text(status, { size: 10, bold: true, color: COLORS[status], gap: 1 });
       text(`${index + 1}. ${item.title || "Untitled item"}`, { size: 13, bold: true, color: "#222222", gap: 2 });
+      statusBadge(status);
       text(`Control ID: ${item.id || "Not specified"} | ${categoryTitle[item.category] || item.category || "Uncategorized"} | ${item.priority || "Priority not specified"}`, { size: 9, color: "#626262" });
       label("Guidance"); bullets(checksFor(item));
       label("Evidence"); text(item.evidence || "Not provided");
@@ -262,7 +288,7 @@
           text(`${entry.path}:${entry.line}${entry.description ? ` - ${entry.description}` : ""}`, { size: 9 });
         }
       }
-      cursor += 5;
+      cursor += 10;
     }
 
     const pageCount = pdf.getNumberOfPages();

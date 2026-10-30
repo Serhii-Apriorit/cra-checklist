@@ -626,17 +626,18 @@
     ],
     "Log injection tests; timestamp configuration; correlated event examples; retention and expiry tests.",
     "Applies where logs support investigation; account for devices with limited or intermittently synchronized clocks.", ENG, ["asvs"]);
-  add(group, "security-log-optout", "Can users opt out of the security-related activity logging identified in the product’s applicability assessment?", "High",
+  add(group, "security-log-optout", "Can users opt out of the recording of their activity, such as data access and setting changes?", "High",
     [
-      "When this applies: the product records or monitors the activity of the person using it for security purposes, such as access to data, services or functions and changes to settings (CRA Annex I, Part I, 2(l)). Typical examples are consumer apps, devices and services that keep per-user activity logs.",
-      "When it does not apply: the product records no user activity at all, or only technical events that do not relate to a user. Mark Not applicable and name what is logged.",
+      "What this covers: the activity log required by CRA Annex I, Part I, 2(l), which records what a user does in the product, such as which data, services or functions they access or change. Product analytics and marketing telemetry are a separate privacy topic and are not assessed here.",
+      "When this applies: the product keeps such a per-user activity log. Typical examples are consumer apps, devices and services with account or device activity histories.",
+      "When it does not apply: the product records no user activity at all, or only technical events that cannot be linked to a user. Mark Not applicable and name what is logged.",
       "For business products where the customer organization is the user, document who exercises the opt-out (for example, the customer’s administrator) and have this interpretation reviewed.",
       "Records required by other law or needed to protect other users may remain after opt-out; list them and the reason.",
       "List the affected event types, exercise the user-facing opt-out, repeat those activities and verify that the affected logging stops.",
       "Explain how opting out affects monitoring, and refer any claimed legal restriction on opting out for legal review."
     ],
     "Opt-out walkthrough; before-and-after event results; user instructions; list of records retained after opt-out with reasons.",
-    "Applies where the product records or monitors user activity for security purposes. Evaluate the Part I 2(l) mechanism in product context and do not ignore other applicable law.", CRA, ["I2l"]);
+    "Applies where the product keeps a per-user activity log. Evaluate the Part I 2(l) mechanism in product context and do not ignore other applicable law.", CRA, ["I2l"]);
 
   group = "supply-chain";
   add(group, "component-due-diligence", "Are third-party components approved for use based on security due diligence?", "High",
@@ -708,14 +709,14 @@
     ],
     "Supply-chain incident plan; exercise record; artifact impact analysis; reporting trigger decision.",
     "Applies to development, build and release infrastructure. A pipeline event needs a reporting-trigger assessment rather than an automatic assumption of regulatory reportability.", ENG, ["ssdf", "reporting"]);
-  add(group, "security-training-role-based", "Does the project have a security training plan for its contributors, and have they completed it?", "Medium",
+  add(group, "security-training-role-based", "Does the project have a security guide for its contributors, and have they completed it?", "Medium",
     [
-      "Check that the project has a documented security training plan for people who join it, such as developers, reviewers and release staff.",
-      "The plan should cover project-specific topics, for example: secure coding for the project’s languages and frameworks, the project threat model, secret handling, and release and vulnerability-handling procedures.",
-      "Verify that each current contributor has completed the plan, with a completion record, and that training is refreshed after significant changes.",
+      "Check that the project has a documented security guide for people who join it, such as developers, reviewers and release staff.",
+      "The guide should cover project-specific topics, for example: secure coding for the project’s languages and frameworks, the project threat model, secret handling, and release and vulnerability-handling procedures.",
+      "Verify that each current contributor has completed the guide, with a completion record, and that the guide is updated and re-shared after significant changes.",
       "General company-wide awareness training alone does not satisfy this question."
     ],
-    "Project security training plan; completion records per contributor; refresher schedule.",
+    "Project security guide; completion records per contributor; update history.",
     "Applies to internal and contracted contributors on the project; training format and cadence follow risk and responsibilities.", ENG, ["ssdf"]);
 
   group = "updates-handoff";
@@ -794,7 +795,7 @@
     ],
     "Update retention policy; archive inventory; continuity and access test.",
     "Applies to security updates issued during the support period; plan beyond supplier handoff or contract expiry.", CRA, ["manufacturer"]);
-  add(group, "article14-reporting-ready", "Is there a tested process to report actively exploited vulnerabilities and severe incidents to authorities within the Article 14 deadlines?", "High",
+  add(group, "article14-reporting-ready", "Is there a tested process to report actively exploited vulnerabilities and severe incidents to authorities within the deadlines?", "High",
     [
       "Check that a named owner decides whether an event is reportable: an actively exploited vulnerability in the product, or a severe incident affecting its security.",
       "Verify the process records when the company became aware of the event, because the deadlines run from that moment.",
@@ -814,9 +815,15 @@
   add(group, "security-evidence-handoff", "When the product is handed over to another team or the customer, do they receive the security documentation needed to maintain it?", "High",
     [
       "Applies when responsibility for maintaining the product moves to another team, the customer or another supplier, for example at project end or when a release is delivered for the customer to operate.",
-      "Check that the handoff package contains: architecture and risk assessment; the Annex I requirements mapping; the SBOM for the delivered release; open vulnerabilities and accepted risks; operating and security configuration instructions; and update, signing and key-ownership procedures.",
-      "Include the scan and test reports required by the test plan (for example SCA, SAST and penetration tests where performed) with remediation and retest results.",
-      "Each report must state the release or artifact it covers, the date and the tool version so the receiver can judge whether it is current.",
+      "Check that the handoff package contains the following security documents.",
+      "Architecture overview: components, data flows and trust boundaries.",
+      "Security risk assessment (threat model), including accepted residual risks and their owners.",
+      "Annex I requirements mapping: a summary table of the CRA Annex I essential requirements from Part I (product security properties) and Part II (vulnerability handling). For each listed requirement, record whether it applies to the product (with the reason if it does not), how it is met, where the supporting evidence is located and who is responsible for it. Refer to the requirements by point number instead of copying the full annex text.",
+      "SBOM for the delivered release.",
+      "Open vulnerabilities and known security issues, with severity and planned fixes.",
+      "Secure deployment and operating instructions: required security settings, hardening steps and how to rotate secrets.",
+      "Update and release procedures: how to build, sign and publish security updates, and who owns the signing keys and other credentials.",
+      "Security test reports required by the test plan (for example SCA, SAST and penetration tests where performed) with remediation and retest results; each report states the release it covers, the date and the tool version.",
       "Verify that the receiving owner has accepted the package and can access and use it, for example through a walkthrough."
     ],
     "Accepted handoff package with evidence index; release-bound scan and test reports; remediation and retest records; update procedure; walkthrough record.",
