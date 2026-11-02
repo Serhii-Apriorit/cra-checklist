@@ -103,7 +103,9 @@ Detailed PDF and Markdown downloads require a product/project, a reviewer and
 an answer for every control; until then the buttons are disabled and hovering
 shows the reason. Reports show dates as YYYY-MM-DD, answer guidance and
 verification steps as bullets, summary tables, the answer above each question,
-and notes only where recorded.
+and notes only where recorded. After the summary, a **Needs remediation**
+section counts and lists every question answered No (or left unanswered) with
+its number and priority, ordered Critical, High, then Medium.
 
 Detailed verification includes **Review with your project agent**. Copy a prompt
 for unanswered controls (or all controls) to an agent with project access, then
