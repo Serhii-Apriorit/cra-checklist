@@ -573,21 +573,24 @@
     ],
     "Network-behavior tests; outbound limits; protocol threat review.",
     "Applies to connected products and device fleets; isolated products may record not applicable with the connectivity rationale.", CRA, ["I2i"]);
-  add(group, "incident-containment-ready", "Can operators quickly isolate a compromised component without disrupting the rest of the product?", "High",
+  add(group, "incident-containment-ready", "Can operators quickly isolate a compromised critical component without disrupting the rest of the product?", "High",
     [
+      "Scope: critical components identified in the risk assessment, whose compromise would affect essential functions, sensitive data or many users, for example: the authentication service, external integrations and their API keys, the update or distribution service, device fleet management and shared multi-tenant data stores.",
+      "Other components can rely on general measures such as stopping, redeploying or restoring them; they do not need dedicated containment actions.",
       "Containment limits an ongoing incident to the affected part, for example: disabling a compromised integration or API key, quarantining a device, revoking a user or service identity, suspending a tenant, switching off a feature with a kill switch, or isolating a host or container from the network.",
-      "List the containment actions available for each major component, who may trigger them and how (admin console, runbook or script).",
+      "For each critical component, list the available containment actions, who may trigger them and how (admin console, runbook or script).",
       "Rehearse at least one containment action in a test environment or drill and record how long it takes.",
       "Verify that essential functions and unaffected users keep working with the protection expected by the risk assessment."
     ],
-    "Containment runbook with actions and owners; drill record with timings; kill-switch or isolation configuration.",
-    "Select containment methods relevant to hosted, installed or device deployments.", ENG, ["I2k", "ssdf"]);
+    "List of critical components; containment runbook with actions and owners; drill record with timings; kill-switch or isolation configuration.",
+    "Applies to the critical components identified in the risk assessment. Select containment methods relevant to hosted, installed or device deployments.", ENG, ["I2k", "ssdf"]);
 
   group = "logging";
-  add(group, "security-event-coverage", "Are the required security event types recorded?", "High",
+  add(group, "security-event-coverage", "Are the required security event types recorded and fully covered?", "High",
     [
       "Compare actual emitted events with the event catalogue derived from the risk assessment.",
       "Exercise authentication failures, access changes, sensitive operations and configuration changes.",
+      "Fully covered means each event type in the catalogue is recorded on every path that can trigger it, such as the UI, APIs, administrative tools, background jobs and device interfaces, not only the main user flow.",
       "Check coverage here; assess entry structure and timestamps, alert delivery, and log protection under their separate controls."
     ],
     "Event catalogue; generated event samples; monitoring configuration.",
@@ -623,16 +626,18 @@
     ],
     "Log injection tests; timestamp configuration; correlated event examples; retention and expiry tests.",
     "Applies where logs support investigation; account for devices with limited or intermittently synchronized clocks.", ENG, ["asvs"]);
-  add(group, "security-log-optout", "Can users opt out of the security-related activity logging identified in the product’s applicability assessment?", "High",
+  add(group, "security-log-optout", "Can users opt out of the recording of their activity, such as data access and setting changes?", "High",
     [
-      "Identify the security-related activity logging covered by this control in the product’s applicability assessment.",
-      "List the affected event types, such as access to protected data or changes to security settings.",
-      "Exercise the user-facing opt-out, repeat those activities and verify that the affected logging stops.",
-      "Explain which records remain, why they remain and how opting out affects monitoring.",
-      "Refer any claimed legal restriction on opting out for legal review; do not assume an administrator-only setting satisfies the user mechanism."
+      "What this covers: the activity log required by CRA Annex I, Part I, 2(l), which records what a user does in the product, such as which data, services or functions they access or change. Product analytics and marketing telemetry are a separate privacy topic and are not assessed here.",
+      "When this applies: the product keeps such a per-user activity log. Typical examples are consumer apps, devices and services with account or device activity histories.",
+      "When it does not apply: the product records no user activity at all, or only technical events that cannot be linked to a user. Mark Not applicable and name what is logged.",
+      "For business products where the customer organization is the user, document who exercises the opt-out (for example, the customer’s administrator) and have this interpretation reviewed.",
+      "Records required by other law or needed to protect other users may remain after opt-out; list them and the reason.",
+      "List the affected event types, exercise the user-facing opt-out, repeat those activities and verify that the affected logging stops.",
+      "Explain how opting out affects monitoring, and refer any claimed legal restriction on opting out for legal review."
     ],
-    "Opt-out walkthrough; before-and-after event results; user instructions.",
-    "Evaluate the Part I 2(l) mechanism in product context; do not silently replace opt-out with an administrator-only setting or ignore other applicable law.", CRA, ["I2l"]);
+    "Opt-out walkthrough; before-and-after event results; user instructions; list of records retained after opt-out with reasons.",
+    "Applies where the product keeps a per-user activity log. Evaluate the Part I 2(l) mechanism in product context and do not ignore other applicable law.", CRA, ["I2l"]);
 
   group = "supply-chain";
   add(group, "component-due-diligence", "Are third-party components approved for use based on security due diligence?", "High",
@@ -695,38 +700,35 @@
     ],
     "Artifact digests; authenticated provenance or signed release manifest; source/build identifiers; release approvals; signature-verification and tampering/substitution tests.",
     "Applies to distributed software, firmware and hosted product releases. Select suitable digest and authentication mechanisms for the release channel; an unauthenticated checksum alone is insufficient. The CRA does not mandate one particular digest algorithm or provenance tool.", ENG, ["ssdf"]);
-  add(group, "pipeline-compromise-response", "Does the response plan assess product impact after a pipeline or signing compromise?", "High",
+  add(group, "pipeline-compromise-response", "Is there a tested plan for handling a compromise of the build pipeline, source repository or signing keys?", "High",
     [
-      "Rehearse a compromised runner, repository or signing key.",
-      "Assess affected artifacts and users, containment, credential revocation and whether Article 14 actively exploited vulnerability or severe-incident triggers are met."
+      "Check that the incident plan covers a compromised CI runner, source repository, package registry account or signing key.",
+      "Verify the plan explains how to identify affected releases and users (for example, from build provenance and SBOMs), revoke and rotate credentials and keys, rebuild from a trusted state and notify users.",
+      "Rehearse one scenario, for example as a tabletop exercise, and record the outcome.",
+      "Include the decision whether Article 14 reporting is triggered (actively exploited vulnerability or severe incident)."
     ],
-    "Supply-chain incident exercise; artifact impact analysis; reporting trigger decision.",
-    "Applies to development, production and maintenance infrastructure; a pipeline event needs trigger assessment rather than an automatic assumption of regulatory reportability.", ENG, ["ssdf", "reporting"]);
-  add(group, "security-training-role-based", "Do contributors receive security training suited to their responsibilities?", "Medium",
+    "Supply-chain incident plan; exercise record; artifact impact analysis; reporting trigger decision.",
+    "Applies to development, build and release infrastructure. A pipeline event needs a reporting-trigger assessment rather than an automatic assumption of regulatory reportability.", ENG, ["ssdf", "reporting"]);
+  add(group, "security-training-role-based", "Does the project have a security guide for its contributors, and have they completed it?", "Medium",
     [
-      "Review onboarding and refresher coverage for developers, reviewers, release staff and support.",
-      "Use relevant product weaknesses or exercises to verify practical understanding."
+      "Check that the project has a documented security guide for people who join it, such as developers, reviewers and release staff.",
+      "The guide should cover project-specific topics, for example: secure coding for the project’s languages and frameworks, the project threat model, secret handling, and release and vulnerability-handling procedures.",
+      "Verify that each current contributor has completed the guide, with a completion record, and that the guide is updated and re-shared after significant changes.",
+      "General company-wide awareness training alone does not satisfy this question."
     ],
-    "Training plan; attendance; role-based exercise results.",
-    "Applies to internal and contracted contributors; training format and cadence follow risk and responsibilities.", ENG, ["ssdf"]);
+    "Project security guide; completion records per contributor; update history.",
+    "Applies to internal and contracted contributors on the project; training format and cadence follow risk and responsibilities.", ENG, ["ssdf"]);
 
   group = "updates-handoff";
-  add(group, "update-authenticity-integrity", "Does the product verify update authenticity and integrity before installation?", "Critical",
+  add(group, "update-authenticity-integrity", "Does the product install only authentic, intended updates and stay updatable if an installation fails?", "Critical",
     [
       "Attempt modified packages, untrusted signing keys and substituted update metadata.",
-      "Verify a trusted signature or equivalent authenticated mechanism; a checksum delivered alongside an untrusted download does not prove authenticity."
+      "Verify a trusted signature or equivalent authenticated mechanism; a checksum delivered alongside an untrusted download does not prove authenticity.",
+      "Verify that wrong-product packages, replayed packages and unauthorized downgrades are rejected according to the update policy.",
+      "For installed software and devices, interrupt an update and verify the product completes it or returns to a working state that can still receive updates (for example, through A/B partitions or rollback)."
     ],
-    "Update trust design; tampered-package tests; signing-key policy.",
-    "Applies to updateable software and devices; evaluate packages, metadata and the trust chain together.", ENG, ["II7", "I2f", "ssdf"]);
-  add(group, "update-installation-recovery", "Can an interrupted or failed security update return the product to a supported working state?", "High",
-    [
-      "Test upgrades from supported versions and interrupt installation at defined stages.",
-      "Verify completion or recovery to a supported working state without data loss beyond the documented recovery policy.",
-      "Reject wrong-product packages, replayed packages and unauthorized downgrades according to the update policy.",
-      "Assess package authenticity before installation and authorization inside recovery mode separately."
-    ],
-    "Update matrix; interruption tests; recovery and downgrade review.",
-    "Applies to updateable products; select rollback controls according to risk and recovery needs.", ENG, ["I2c", "II7", "I2h"]);
+    "Update trust design; tampered-package, downgrade and interruption tests; signing-key policy.",
+    "Applies to updateable software and devices; evaluate packages, metadata and the trust chain together. Interruption tests apply where updates are installed on the user's side.", ENG, ["II7", "I2c", "I2f", "ssdf"]);
   add(group, "automatic-update-controls", "Are applicable automatic security updates enabled with usable user controls?", "High",
     [
       "Check default automation, an appropriate installation window, available-update notifications, temporary postponement and an easy opt-out.",
@@ -793,21 +795,16 @@
     ],
     "Update retention policy; archive inventory; continuity and access test.",
     "Applies to security updates issued during the support period; plan beyond supplier handoff or contract expiry.", CRA, ["manufacturer"]);
-  add(group, "article14-reporting-ready", "Can the responsible manufacturer assess and meet Article 14 reporting duties?", "High",
+  add(group, "article14-reporting-ready", "Is there a tested process to report actively exploited vulnerabilities and severe incidents to authorities within the deadlines?", "High",
     [
-      "Rehearse reporting triggers, awareness timestamps, 24-hour warning and 72-hour notification.",
-      "Verify final-report timing: 14 days after a corrective or mitigating measure becomes available for an actively exploited vulnerability; one month after incident notification for a severe incident.",
-      "Include affected-user communication and CSIRT/ENISA channels."
+      "Check that a named owner decides whether an event is reportable: an actively exploited vulnerability in the product, or a severe incident affecting its security.",
+      "Verify the process records when the company became aware of the event, because the deadlines run from that moment.",
+      "Deadlines: early warning within 24 hours, notification within 72 hours, and a final report within 14 days after a fix or mitigation is available (vulnerabilities) or within one month after the notification (severe incidents).",
+      "Verify the reporting channel (ENISA single reporting platform and the coordinating national CSIRT) and how affected users are informed.",
+      "Rehearse the process with a timed exercise and record the results."
     ],
-    "Reporting playbook; timed exercise; reporting owner and trigger assessment.",
-    "Applies to reportable events under Article 14. Routine findings and pipeline incidents require trigger assessment; final-report timing differs for vulnerabilities and incidents.", CRA, ["reporting"]);
-  add(group, "contract-roles-responsibilities", "Are customer, contractor and manufacturer responsibilities explicitly allocated?", "High",
-    [
-      "Agree ownership of implementation, risk decisions, conformity documentation, support and reporting.",
-      "Record the statutory-role analysis separately: a contractor's label in a contract does not decide its legal status."
-    ],
-    "Responsibility matrix; signed scope; statutory-role review.",
-    "Applies to outsourced work, integration and handoff; statutory obligations remain determined by applicable law and actual activities.", CONTRACT, ["manufacturer", "reporting"]);
+    "Reporting playbook with owner and triggers; timed exercise record; user-notification template.",
+    "Applies to reportable events under Article 14, which have applied since 11 September 2026. Routine findings and pipeline incidents require a trigger assessment; final-report timing differs for vulnerabilities and incidents.", CRA, ["reporting"]);
   add(group, "escalation-service-levels", "Are vulnerability escalation and response service levels agreed and exercised?", "High",
     [
       "Specify secure notification routes, severity triage, response targets, out-of-hours coverage and escalation.",
@@ -815,15 +812,22 @@
     ],
     "Escalation matrix; response targets; contact drill and handoff timestamps.",
     "Applies to supplier/customer response arrangements; an SLA does not extend legal notification deadlines.", CONTRACT, ["reporting", "ssdf"]);
-  add(group, "security-evidence-handoff", "Does the handoff provide maintainers with usable security evidence and instructions?", "High",
+  add(group, "security-evidence-handoff", "When the product is handed over to another team or the customer, do they receive the security documentation needed to maintain it?", "High",
     [
-      "Deliver release-linked architecture, risk decisions, Annex I mapping, SBOM, unresolved findings, operating instructions and the secure-update mechanism specification and procedures.",
-      "Include the SCA/SAST and other scan reports required by the test plan, applicable penetration-test findings and remediation/retest results.",
-      "Identify the source/build or artifact, execution date, tool/version and relevant configuration for each report so reviewers can judge coverage and freshness.",
-      "Verify that the receiving owner can access, interpret and use the package."
+      "Applies when responsibility for maintaining the product moves to another team, the customer or another supplier, for example at project end or when a release is delivered for the customer to operate.",
+      "Check that the handoff package contains the following security documents.",
+      "Architecture overview: components, data flows and trust boundaries.",
+      "Security risk assessment (threat model), including accepted residual risks and their owners.",
+      "Annex I requirements mapping: a summary table of the CRA Annex I essential requirements from Part I (product security properties) and Part II (vulnerability handling). For each listed requirement, record whether it applies to the product (with the reason if it does not), how it is met, where the supporting evidence is located and who is responsible for it. Refer to the requirements by point number instead of copying the full annex text.",
+      "SBOM for the delivered release.",
+      "Open vulnerabilities and known security issues, with severity and planned fixes.",
+      "Secure deployment and operating instructions: required security settings, hardening steps and how to rotate secrets.",
+      "Update and release procedures: how to build, sign and publish security updates, and who owns the signing keys and other credentials.",
+      "Security test reports required by the test plan (for example SCA, SAST and penetration tests where performed) with remediation and retest results; each report states the release it covers, the date and the tool version.",
+      "Verify that the receiving owner has accepted the package and can access and use it, for example through a walkthrough."
     ],
-    "Accepted handoff pack and evidence index; release-bound scan/review and applicable penetration-test reports; remediation and retest records; secure-update design/specification; maintainer walkthrough.",
-    "Applies at supplier transfer and major release milestones. Required reports follow the product risk assessment and agreed test plan; do not invent a universal penetration-test obligation. Protect confidential findings and retain evidence under applicable obligations.", CONTRACT, ["manufacturer", "ssdf"]);
+    "Accepted handoff package with evidence index; release-bound scan and test reports; remediation and retest records; update procedure; walkthrough record.",
+    "Applies at handoff to another maintainer and at major delivered releases; mark Not applicable if the same team keeps maintaining the product. Required reports follow the risk assessment and agreed test plan. Protect confidential findings.", CONTRACT, ["manufacturer", "ssdf"]);
 
   const answerGuidance = "Answer Yes only after every applicable check for the control is verified. Answer No if any applicable check fails or a required control is missing. Use Not applicable only when no part of the control applies. Leave an unreviewed control unanswered; optional notes can record mixed results, evidence and applicability decisions.";
 
@@ -838,6 +842,7 @@
     "data-at-rest-protection": [{"id": "device-local-secret-protection", "label": "Are device identities and local keys protected against relevant extraction threats?"}],
     "unauthorized-access-corruption-reporting": [{"id": "monitoring-response-ownership", "label": "Do actionable security alerts reach an accountable response owner?"}],
     "regular-security-testing": [{"id": "secure-sdlc-operational", "label": "Are secure development activities part of the normal delivery process?"}],
+    "update-authenticity-integrity": [{"id": "update-installation-recovery", "label": "Can an interrupted or failed security update return the product to a supported working state?", "revision": 6}],
   };
   for (const item of items) item.mergedFrom = mergedControls[item.id] || [];
 
@@ -849,5 +854,5 @@
   // Revision 5 makes approval and testing of privileged-access alternatives explicit.
   for (const item of items) if (item.id === "privileged-mfa") item.reviewRevision = 5;
 
-  window.CRADetailedCatalog = { version: 1, revision: 5, answerGuidance, categories, items };
+  window.CRADetailedCatalog = { version: 1, revision: 6, answerGuidance, categories, items };
 })();
