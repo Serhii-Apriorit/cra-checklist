@@ -11,6 +11,12 @@
     "Not applicable": { fill: "#f0f4fc", border: "#9bafd4", icon: "`N/A`" },
     Unanswered: { fill: "#f5f5f5", border: "#cccccc", icon: "❔" }
   };
+  // Matches the priority labels in detailed-verification.css.
+  const PRIORITY_BADGES = {
+    Critical: { color: "#9b2720", fill: "#fff2f0", border: "#e1b4ae" },
+    High: { color: "#825900", fill: "#fff8e8", border: "#d8c48e" },
+    Medium: { color: "#4e5d6c", fill: "#f2f5f8", border: "#bac5d0" }
+  };
 
   const clean = value => String(value == null ? "" : value)
     .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/g, "");
@@ -30,16 +36,19 @@
   const countSummary = (state, catalog) => {
     const items = itemsFor(catalog);
     const counts = { Yes: 0, No: 0, "Not applicable": 0, Unanswered: 0 };
-    const unresolvedPriority = { Critical: 0, High: 0 };
-    for (const item of items) {
+    const unresolvedPriority = { Critical: 0, High: 0, Medium: 0 };
+    const remediation = [];
+    for (const [index, item] of items.entries()) {
       const status = statusFor(state, item.id);
       counts[status]++;
       if (status === "No" || status === "Unanswered") {
-        if (/^critical$/i.test(item.priority || "")) unresolvedPriority.Critical++;
-        if (/^high$/i.test(item.priority || "")) unresolvedPriority.High++;
+        if (Object.hasOwn(unresolvedPriority, item.priority)) unresolvedPriority[item.priority]++;
+        remediation.push({ number: index + 1, item, status });
       }
     }
-    return { items, counts, reviewed: items.length - counts.Unanswered, total: items.length, unresolvedPriority };
+    const order = { Critical: 0, High: 1, Medium: 2 };
+    remediation.sort((a, b) => (order[a.item.priority] ?? 3) - (order[b.item.priority] ?? 3) || a.number - b.number);
+    return { items, counts, reviewed: items.length - counts.Unanswered, total: items.length, unresolvedPriority, remediation };
   };
 
   // Escape user-provided text so Markdown cannot turn it into raw HTML or markup.
@@ -85,7 +94,7 @@
   };
 
   function markdown(state = {}, catalog = {}, options = { includeFileEvidence: false }) {
-    const { items, counts, total, unresolvedPriority } = countSummary(state, catalog);
+    const { items, counts, total, unresolvedPriority, remediation } = countSummary(state, catalog);
     const categories = Array.isArray(catalog.categories) ? catalog.categories : [];
     const categoryTitle = Object.fromEntries(categories.map(category => [category.id, category.title]));
     const out = [
@@ -101,9 +110,14 @@
       `| Yes | ${counts.Yes} |`, `| No | ${counts.No} |`, `| Not applicable | ${counts["Not applicable"]} |`,
       ...(counts.Unanswered ? [`| Unanswered | ${counts.Unanswered} |`] : []),
       `| **Total** | **${total}** |`, "",
-      "**Needs remediation (No or unanswered)**", "",
-      "| Priority | Controls |", "| --- | ---: |",
-      `| Critical | ${unresolvedPriority.Critical} |`, `| High | ${unresolvedPriority.High} |`, ""
+      "## Needs remediation", "",
+      "Questions answered No or left unanswered, ordered by priority.", "",
+      "| Priority | Questions |", "| --- | ---: |",
+      `| Critical | ${unresolvedPriority.Critical} |`, `| High | ${unresolvedPriority.High} |`, `| Medium | ${unresolvedPriority.Medium} |`, "",
+      ...(remediation.length
+        ? ["| # | Priority | Question | Answer |", "| ---: | --- | --- | --- |",
+          ...remediation.map(({ number, item, status }) => `| ${number} | ${md(item.priority || "Not specified")} | ${md(item.title || "Untitled item")} | ${md(status)} |`), ""]
+        : ["No questions need remediation.", ""])
     ];
     for (const [index, item] of items.entries()) {
       const answer = statusFor(state, item.id);
@@ -243,6 +257,13 @@
       cursor += height;
     };
     const label = value => text(value.toUpperCase(), { size: 8, bold: true, color: "#626262", gap: 1 });
+    const priorityBadge = priority => {
+      const badge = PRIORITY_BADGES[priority] || PRIORITY_BADGES.Medium;
+      pdf.setLineWidth(0.3); pdf.setDrawColor(badge.border); pdf.setFillColor(badge.fill);
+      pdf.roundedRect(left, cursor - 3.6, 18, 5, 1, 1, "FD");
+      font(7, true, badge.color); pdf.text(priority || "Unknown", left + 9, cursor, { align: "center" });
+      pdf.setLineWidth(0.2);
+    };
     const section = value => { ensure(40); cursor += 3; text(value, { size: 15, bold: true, color: "#222222", gap: 4 }); };
     const list = (value, options = {}) => text(value, options);
 
@@ -259,10 +280,19 @@
     tableRow("Not applicable", summary.counts["Not applicable"], COLORS["Not applicable"]);
     if (summary.counts.Unanswered) tableRow("Unanswered", summary.counts.Unanswered, COLORS.Unanswered);
     tableRow("Total", summary.total, "#222222", true);
+
+    section("Needs remediation");
+    text("Questions answered No or left unanswered, ordered by priority.", { size: 9, color: "#626262", gap: 3 });
+    tableRow("Critical", summary.unresolvedPriority.Critical, PRIORITY_BADGES.Critical.color);
+    tableRow("High", summary.unresolvedPriority.High, PRIORITY_BADGES.High.color);
+    tableRow("Medium", summary.unresolvedPriority.Medium, PRIORITY_BADGES.Medium.color);
     cursor += 4;
-    label("Needs remediation (No or unanswered)"); cursor += 3;
-    tableRow("Critical", summary.unresolvedPriority.Critical);
-    tableRow("High", summary.unresolvedPriority.High);
+    if (!summary.remediation.length) text("No questions need remediation.", { color: "#626262" });
+    for (const { number, item, status } of summary.remediation) {
+      ensure(8);
+      priorityBadge(item.priority);
+      text(`${number}. ${item.title || "Untitled item"}${status === "Unanswered" ? " (unanswered)" : ""}`, { size: 9.5, gap: 2.5, indent: 22 });
+    }
 
     nextPage();
     section("Detailed assessment");
